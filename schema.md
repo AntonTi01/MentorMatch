@@ -12,7 +12,7 @@
 - username: text — Telegram (полная ссылка вида https://t.me/<username>)
 - is_confirmed: boolean — подтверждён ли пользователь в Telegram
 - role: varchar(20), NOT NULL — 'student' | 'supervisor' | 'admin'
-- embeddings: text
+- embeddings: vector (pgvector)
 - consent_personal: boolean — согласие на обработку персональных данных
 - consent_private: boolean — согласие на обработку закрытых данных (если есть)
 - created_at, updated_at: timestamptz, NOT NULL, DEFAULT now()
@@ -79,7 +79,7 @@
 - required_skills: text — подтягиваем известные skills студента при создании его темы
 - direction: smallint — направление (9/11/45), опционально
 - seeking_role: varchar(20), NOT NULL — 'student' | 'supervisor' (кого ищет автор темы)
-- embeddings: text
+- embeddings: vector (pgvector)
 - cover_media_id: bigint, FK → media_files.id (ON DELETE SET NULL)
 - approved_supervisor_user_id: bigint, FK → users.id (утверждённый руководитель)
 - is_active: boolean, NOT NULL, DEFAULT true
@@ -94,6 +94,7 @@
 - description: text — описание роли
 - required_skills: text — требования к роли
 - capacity: int — сколько людей нужно на эту роль (опционально)
+- embeddings: vector (pgvector)
 - approved_student_user_id: bigint, FK → users.id (утверждённый студент)
 - created_at, updated_at
 

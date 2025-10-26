@@ -11,6 +11,11 @@ from sheet_pairs import sync_roles_sheet
 from utils import parse_optional_int
 
 from ..context import AdminContext
+from matching.embeddings import (
+    refresh_role_embedding,
+    refresh_supervisor_embedding,
+    refresh_topic_embedding,
+)
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
     templates = ctx.templates
@@ -44,6 +49,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
     ):
         author_full_name = (author_full_name or '').strip()
         with ctx.get_conn() as conn, conn.cursor() as cur:
+            topic_id_created: Optional[int] = None
             uid: Optional[int] = None
             author_uid = parse_optional_int(author_user_id)
             if author_uid is not None:
@@ -59,6 +65,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                         (author_full_name,),
                     )
                     uid = cur.fetchone()[0]
+                    refresh_supervisor_embedding(conn, uid)
             if uid is None:
                 notice = urllib.parse.quote('Укажите автора темы')
                 return RedirectResponse(url=f'/add-topic?msg={notice}', status_code=303)
@@ -74,6 +81,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     INSERT INTO topics(author_user_id, title, description, expected_outcomes, required_skills, direction,
                                        seeking_role, is_active, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, now(), now())
+                    RETURNING id
                     ''',
                     (
                         uid,
@@ -85,6 +93,10 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                         seeking_role,
                     ),
                 )
+                inserted = cur.fetchone()
+                if inserted:
+                    topic_id_created = inserted[0]
+                    refresh_topic_embedding(conn, topic_id_created)
         notice = urllib.parse.quote('Тема добавлена')
         return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
 
@@ -165,6 +177,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     topic_id,
                 ),
             )
+            refresh_topic_embedding(conn, topic_id)
         notice = urllib.parse.quote('Тема обновлена')
         return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
 
@@ -261,6 +274,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 '''
                 INSERT INTO roles(topic_id, name, description, required_skills, capacity, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, now(), now())
+                RETURNING id
                 ''',
                 (
                     topic_id,
@@ -270,6 +284,9 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     capacity_val,
                 ),
             )
+            new_role_row = cur.fetchone()
+            if new_role_row:
+                refresh_role_embedding(conn, new_role_row[0])
         sync_roles_sheet(ctx.get_conn)
         notice = urllib.parse.quote('Роль добавлена')
         return RedirectResponse(url=f'/topic/{topic_id}?msg={notice}', status_code=303)
@@ -334,6 +351,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 notice = urllib.parse.quote('???? ?? ???????')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
             topic_id_value = row[0]
+            refresh_role_embedding(conn, role_id)
         sync_roles_sheet(ctx.get_conn)
         notice = urllib.parse.quote('???? ?????????')
         return RedirectResponse(url=f'/topic/{topic_id_value}?msg={notice}', status_code=303)
@@ -412,4 +430,6 @@ def _ensure_author(ctx: AdminContext, author_user_id: Optional[str], author_full
             "INSERT INTO users(full_name, role, created_at, updated_at) VALUES (%s, 'supervisor', now(), now()) RETURNING id",
             (author_full_name.strip(),),
         )
-        return cur.fetchone()[0]
+        new_id = cur.fetchone()[0]
+        refresh_supervisor_embedding(conn, new_id)
+        return new_id

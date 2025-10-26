@@ -8,6 +8,11 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 from psycopg2.extensions import connection
 
 from media_store import persist_media_from_url
+from matching.embeddings import (
+    refresh_student_embedding,
+    refresh_supervisor_embedding,
+    refresh_topic_embedding,
+)
 from .topic_extraction import extract_topics_from_text, fallback_extract_topics
 
 logger = logging.getLogger(__name__)
@@ -82,6 +87,7 @@ def import_students(
             email = (row.get("email") or "").strip()
             if not (full_name or email):
                 continue
+            needs_student_refresh = False
 
             if email:
                 cur.execute(
@@ -107,6 +113,7 @@ def import_students(
                 )
                 user_id = cur.fetchone()[0]
                 inserted_users += 1
+                needs_student_refresh = True
 
             updates: List[str] = []
             params: List[Any] = []
@@ -128,6 +135,7 @@ def import_students(
                     f"UPDATE users SET {', '.join(updates)}, updated_at=now() WHERE id=%s",
                     tuple(params),
                 )
+                needs_student_refresh = True
 
             cur.execute("SELECT 1 FROM student_profiles WHERE user_id=%s", (user_id,))
             profile_exists = cur.fetchone() is not None
@@ -174,6 +182,7 @@ def import_students(
                     """,
                     (*profile_args, user_id),
                 )
+                needs_student_refresh = True
             else:
                 cur.execute(
                     """
@@ -190,6 +199,7 @@ def import_students(
                     """,
                     (user_id, *profile_args),
                 )
+                needs_student_refresh = True
             inserted_profiles += 1
 
             topic_payload = row.get("topic") or {}
@@ -215,6 +225,7 @@ def import_students(
                         INSERT INTO topics(author_user_id, title, description, expected_outcomes,
                                            required_skills, seeking_role, is_active, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, 'supervisor', TRUE, now(), now())
+                        RETURNING id
                         """,
                         (
                             user_id,
@@ -224,7 +235,12 @@ def import_students(
                             skills_have,
                         ),
                     )
+                    topic_row = cur.fetchone()
+                    if topic_row:
+                        refresh_topic_embedding(conn, topic_row[0])
                     inserted_topics += 1
+            if needs_student_refresh:
+                refresh_student_embedding(conn, user_id)
 
     conn.commit()
     return {
@@ -259,6 +275,7 @@ def import_supervisors(
             email = (row.get("email") or "").strip() or None
             if not (full_name or email):
                 continue
+            needs_supervisor_refresh = False
 
             if email:
                 cur.execute(
@@ -284,6 +301,7 @@ def import_supervisors(
                 )
                 user_id = cur.fetchone()[0]
                 inserted_users += 1
+                needs_supervisor_refresh = True
 
             updates: List[str] = []
             params: List[Any] = []
@@ -299,6 +317,7 @@ def import_supervisors(
                     f"UPDATE users SET {', '.join(updates)}, updated_at=now() WHERE id=%s",
                     tuple(params),
                 )
+                needs_supervisor_refresh = True
 
             cur.execute("SELECT 1 FROM supervisor_profiles WHERE user_id=%s", (user_id,))
             profile_exists = cur.fetchone() is not None
@@ -314,6 +333,7 @@ def import_supervisors(
                     """,
                     (interests, requirements, user_id),
                 )
+                needs_supervisor_refresh = True
             else:
                 cur.execute(
                     """
@@ -322,6 +342,7 @@ def import_supervisors(
                     """,
                     (user_id, None, None, None, interests, requirements),
                 )
+                needs_supervisor_refresh = True
             upserted_profiles += 1
 
             def _insert_from_text(text: Optional[str], direction: Optional[int]) -> None:
@@ -344,6 +365,7 @@ def import_supervisors(
                         INSERT INTO topics(author_user_id, title, description, expected_outcomes,
                                            required_skills, direction, seeking_role, is_active, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s, 'student', TRUE, now(), now())
+                        RETURNING id
                         """,
                         (
                             user_id,
@@ -354,6 +376,9 @@ def import_supervisors(
                             direction,
                         ),
                     )
+                    inserted_topic_row = cur.fetchone()
+                    if inserted_topic_row:
+                        refresh_topic_embedding(conn, inserted_topic_row[0])
                     inserted_topics += 1
 
             _insert_from_text(row.get("topics_09"), 9)
@@ -361,6 +386,8 @@ def import_supervisors(
             _insert_from_text(row.get("topics_45"), 45)
             if not any((row.get("topics_09"), row.get("topics_11"), row.get("topics_45"))):
                 _insert_from_text(row.get("topics_text"), None)
+            if needs_supervisor_refresh:
+                refresh_supervisor_embedding(conn, user_id)
 
     conn.commit()
     return {

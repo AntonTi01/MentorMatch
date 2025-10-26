@@ -250,7 +250,7 @@ def handle_match_student(
         return {"status": "error", "message": f"Student #{student_user_id} not found"}
 
     student["cv"] = resolve_cv_text(conn, student.get("cv"))
-    roles = fetch_roles_needing_students(conn, limit=40)
+    roles = fetch_roles_needing_students(conn, student_user_id, limit=40)
     if not roles:
         return {"status": "ok", "student_user_id": student_user_id, "items": []}
 
@@ -319,7 +319,7 @@ def handle_match_supervisor_user(
     if not supervisor:
         return {"status": "error", "message": f"Supervisor #{supervisor_user_id} not found"}
 
-    topics = fetch_topics_needing_supervisors(conn, limit=20)
+    topics = fetch_topics_needing_supervisors(conn, supervisor_user_id, limit=20)
     if not topics:
         return {"status": "ok", "supervisor_user_id": supervisor_user_id, "items": []}
 

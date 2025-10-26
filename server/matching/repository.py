@@ -1,10 +1,13 @@
 """Database access helpers for matching workflows."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 import psycopg2.extras
 from psycopg2.extensions import connection
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_topic(conn: connection, topic_id: int) -> Optional[Dict[str, Any]]:
@@ -37,7 +40,21 @@ def fetch_role(conn: connection, role_id: int) -> Optional[Dict[str, Any]]:
             (role_id,),
         )
         row = cur.fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    data = dict(row)
+    data["topic"] = {
+        "id": data.get("topic_id"),
+        "title": data.get("topic_title"),
+        "description": data.get("topic_description"),
+        "expected_outcomes": data.get("topic_expected_outcomes"),
+        "required_skills": data.get("topic_required_skills"),
+        "direction": data.get("direction"),
+        "seeking_role": data.get("seeking_role"),
+        "author_user_id": data.get("author_user_id"),
+        "author_name": data.get("author_name"),
+    }
+    return data
 
 
 def fetch_candidates(
@@ -48,82 +65,94 @@ def fetch_candidates(
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         if role == "student":
-            try:
-                cur.execute(
-                    """
-                    SELECT u.id AS user_id, u.full_name, u.username, u.email, u.created_at,
-                           tc.score,
-                           sp.program, sp.skills, sp.interests, sp.cv,
-                           sp.skills_to_learn, sp.preferred_team_track, sp.team_has AS team_role, sp.team_needs,
-                           sp.dev_track, sp.science_track, sp.startup_track
-                    FROM topic_candidates tc
-                    JOIN users u ON u.id = tc.user_id
-                    LEFT JOIN student_profiles sp ON sp.user_id = u.id
-                    WHERE tc.topic_id = %s
-                    AND (LOWER(u.role) = 'student' OR sp.user_id IS NOT NULL)
-                    ORDER BY tc.score DESC NULLS LAST, u.created_at DESC
-                    LIMIT %s
-                    """,
-                    (topic_id, limit),
-                )
-                rows = cur.fetchall()
-                if rows:
-                    return [dict(r) for r in rows]
-            except Exception:
-                pass
-
             cur.execute(
                 """
-                SELECT u.id AS user_id, u.full_name, u.username, u.email, u.created_at,
-                       NULL::double precision AS score,
-                       sp.program, sp.skills, sp.interests, sp.cv,
-                       sp.skills_to_learn, sp.preferred_team_track, sp.team_has AS team_role, sp.team_needs,
-                       sp.dev_track, sp.science_track, sp.startup_track
-                FROM users u
+                SELECT
+                    u.id AS user_id,
+                    u.full_name,
+                    u.username,
+                    u.email,
+                    u.created_at,
+                    (u.embeddings <=> t.embeddings) AS distance,
+                    sp.program,
+                    sp.skills,
+                    sp.interests,
+                    sp.cv,
+                    sp.skills_to_learn,
+                    sp.preferred_team_track,
+                    sp.team_has AS team_role,
+                    sp.team_needs,
+                    sp.dev_track,
+                    sp.science_track,
+                    sp.startup_track
+                FROM topics t
+                JOIN users u ON LOWER(u.role) = 'student' AND u.embeddings IS NOT NULL
                 LEFT JOIN student_profiles sp ON sp.user_id = u.id
-                WHERE (LOWER(u.role) = 'student' OR sp.user_id IS NOT NULL)
-                ORDER BY u.created_at DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            return [dict(r) for r in cur.fetchall()]
-
-        try:
-            cur.execute(
-                """
-                SELECT u.id AS user_id, u.full_name, u.username, u.email, u.created_at,
-                       tc.score,
-                       sp.position, sp.degree, sp.capacity, sp.interests
-                FROM topic_candidates tc
-                JOIN users u ON u.id = tc.user_id AND LOWER(u.role) = 'supervisor'
-                LEFT JOIN supervisor_profiles sp ON sp.user_id = u.id
-                WHERE tc.topic_id = %s
-                ORDER BY tc.score DESC NULLS LAST, u.created_at DESC
+                WHERE t.id = %s
+                  AND t.embeddings IS NOT NULL
+                ORDER BY u.embeddings <=> t.embeddings ASC
                 LIMIT %s
                 """,
                 (topic_id, limit),
             )
-            rows = cur.fetchall()
-            if rows:
-                return [dict(r) for r in rows]
-        except Exception:
-            pass
+        else:
+            cur.execute(
+                """
+                SELECT
+                    u.id AS user_id,
+                    u.full_name,
+                    u.username,
+                    u.email,
+                    u.created_at,
+                    (u.embeddings <=> t.embeddings) AS distance,
+                    sp.position,
+                    sp.degree,
+                    sp.capacity,
+                    sp.interests
+                FROM topics t
+                JOIN users u ON LOWER(u.role) = 'supervisor'
+                    AND u.embeddings IS NOT NULL
+                    AND u.id <> t.author_user_id
+                LEFT JOIN supervisor_profiles sp ON sp.user_id = u.id
+                WHERE t.id = %s
+                  AND t.embeddings IS NOT NULL
+                ORDER BY u.embeddings <=> t.embeddings ASC
+                LIMIT %s
+                """,
+                (topic_id, limit),
+            )
+        rows = cur.fetchall()
 
-        cur.execute(
-            """
-            SELECT u.id AS user_id, u.full_name, u.username, u.email, u.created_at,
-                   NULL::double precision AS score,
-                   sp.position, sp.degree, sp.capacity, sp.interests
-            FROM users u
-            LEFT JOIN supervisor_profiles sp ON sp.user_id = u.id
-            WHERE LOWER(u.role) = 'supervisor'
-            ORDER BY u.created_at DESC
-            LIMIT %s
-            """,
-            (limit,),
+    candidates: List[Dict[str, Any]] = []
+    log_payload: List[Dict[str, Any]] = []
+    for row in rows:
+        data = dict(row)
+        distance = data.pop("distance", None)
+        score: Optional[float] = None
+        if distance is not None:
+            distance = float(distance)
+            score = 1.0 - distance
+        data["score"] = score
+        candidates.append(data)
+        log_payload.append(
+            {
+                "id": data.get("user_id"),
+                "full_name": data.get("full_name"),
+                "score": score,
+                "distance": distance,
+            }
         )
-        return [dict(r) for r in cur.fetchall()]
+
+    if log_payload:
+        logger.info(
+            "Top %s %s candidates for topic %s by cosine distance: %s",
+            len(log_payload),
+            role,
+            topic_id,
+            log_payload,
+        )
+
+    return candidates
 
 
 def fetch_student(conn: connection, student_user_id: int) -> Optional[Dict[str, Any]]:
@@ -161,22 +190,69 @@ def fetch_topics_needing_students(conn: connection, limit: int = 20) -> List[Dic
         return [dict(r) for r in cur.fetchall()]
 
 
-def fetch_roles_needing_students(conn: connection, limit: int = 40) -> List[Dict[str, Any]]:
+def fetch_roles_needing_students(
+    conn: connection, student_user_id: int, limit: int = 40
+) -> List[Dict[str, Any]]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT r.id, r.name, r.description, r.required_skills, r.capacity,
-                   t.id AS topic_id, t.title AS topic_title, t.direction,
-                   t.author_user_id, u.full_name AS author_name
-            FROM roles r
-            JOIN topics t ON t.id = r.topic_id AND t.is_active = TRUE AND t.seeking_role = 'student'
-            JOIN users u ON u.id = t.author_user_id
-            ORDER BY t.created_at DESC, r.id ASC
+            SELECT
+                r.id,
+                r.name,
+                r.description,
+                r.required_skills,
+                r.capacity,
+                t.id AS topic_id,
+                t.title AS topic_title,
+                t.direction,
+                t.author_user_id,
+                author.full_name AS author_name,
+                (r.embeddings <=> su.embeddings) AS distance
+            FROM users su
+            JOIN roles r ON r.embeddings IS NOT NULL
+            JOIN topics t ON t.id = r.topic_id
+                AND t.is_active = TRUE
+                AND t.seeking_role = 'student'
+            JOIN users author ON author.id = t.author_user_id
+            WHERE su.id = %s
+              AND su.embeddings IS NOT NULL
+              AND LOWER(su.role) = 'student'
+            ORDER BY r.embeddings <=> su.embeddings ASC
             LIMIT %s
             """,
-            (limit,),
+            (student_user_id, limit),
         )
-        return [dict(r) for r in cur.fetchall()]
+        rows = cur.fetchall()
+
+    roles: List[Dict[str, Any]] = []
+    log_payload: List[Dict[str, Any]] = []
+    for row in rows:
+        data = dict(row)
+        distance = data.pop("distance", None)
+        score: Optional[float] = None
+        if distance is not None:
+            distance = float(distance)
+            score = 1.0 - distance
+        data["score"] = score
+        roles.append(data)
+        log_payload.append(
+            {
+                "role_id": data.get("id"),
+                "topic_id": data.get("topic_id"),
+                "score": score,
+                "distance": distance,
+            }
+        )
+
+    if log_payload:
+        logger.info(
+            "Top %s role matches for student %s by cosine distance: %s",
+            len(log_payload),
+            student_user_id,
+            log_payload,
+        )
+
+    return roles
 
 
 def fetch_supervisor(conn: connection, supervisor_user_id: int) -> Optional[Dict[str, Any]]:
@@ -195,21 +271,65 @@ def fetch_supervisor(conn: connection, supervisor_user_id: int) -> Optional[Dict
     return dict(row) if row else None
 
 
-def fetch_topics_needing_supervisors(conn: connection, limit: int = 20) -> List[Dict[str, Any]]:
+def fetch_topics_needing_supervisors(
+    conn: connection, supervisor_user_id: int, limit: int = 20
+) -> List[Dict[str, Any]]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
-            SELECT t.id, t.title, t.description, t.required_skills, t.expected_outcomes,
-                   t.author_user_id, u.full_name AS author_name, t.created_at
-            FROM topics t
-            JOIN users u ON u.id = t.author_user_id
-            WHERE t.is_active = TRUE AND t.seeking_role = 'supervisor'
-            ORDER BY t.created_at DESC
+            SELECT
+                t.id,
+                t.title,
+                t.description,
+                t.required_skills,
+                t.expected_outcomes,
+                t.author_user_id,
+                author.full_name AS author_name,
+                (t.embeddings <=> sup.embeddings) AS distance
+            FROM users sup
+            JOIN topics t ON t.embeddings IS NOT NULL
+                AND t.is_active = TRUE
+                AND t.seeking_role = 'supervisor'
+            JOIN users author ON author.id = t.author_user_id
+            WHERE sup.id = %s
+              AND sup.embeddings IS NOT NULL
+              AND LOWER(sup.role) = 'supervisor'
+            ORDER BY t.embeddings <=> sup.embeddings ASC
             LIMIT %s
             """,
-            (limit,),
+            (supervisor_user_id, limit),
         )
-        return [dict(r) for r in cur.fetchall()]
+        rows = cur.fetchall()
+
+    topics: List[Dict[str, Any]] = []
+    log_payload: List[Dict[str, Any]] = []
+    for row in rows:
+        data = dict(row)
+        distance = data.pop("distance", None)
+        score: Optional[float] = None
+        if distance is not None:
+            distance = float(distance)
+            score = 1.0 - distance
+        data["score"] = score
+        topics.append(data)
+        log_payload.append(
+            {
+                "topic_id": data.get("id"),
+                "title": data.get("title"),
+                "score": score,
+                "distance": distance,
+            }
+        )
+
+    if log_payload:
+        logger.info(
+            "Top %s topic matches for supervisor %s by cosine distance: %s",
+            len(log_payload),
+            supervisor_user_id,
+            log_payload,
+        )
+
+    return topics
 
 
 __all__ = [

@@ -12,6 +12,7 @@ from sheet_pairs import sync_roles_sheet
 from utils import parse_optional_int
 
 from ..context import AdminContext
+from matching.embeddings import refresh_role_embedding, refresh_topic_embedding
 
 PAGE_LIMIT = 20
 
@@ -264,6 +265,7 @@ def _apply_assignment_updates(
                     (student_id, role_id),
                 )
                 updated_roles += 1
+                refresh_role_embedding(conn, role_id)
 
             for topic_id, supervisor_id in topic_updates.items():
                 cur.execute(
@@ -287,6 +289,7 @@ def _apply_assignment_updates(
                     (supervisor_id, topic_id),
                 )
                 updated_topics += 1
+                refresh_topic_embedding(conn, topic_id)
             conn.commit()
 
     sheet_synced = sync_roles_sheet(ctx.get_conn)

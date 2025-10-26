@@ -11,6 +11,10 @@ from utils import parse_optional_int
 
 from ..context import AdminContext
 from ..utils import normalize_telegram_link
+from matching.embeddings import (
+    refresh_student_embedding,
+    refresh_supervisor_embedding,
+)
 
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
@@ -67,6 +71,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 ''',
                 (user_id, program, skills, interests, cv),
             )
+            refresh_student_embedding(conn, user_id)
         notice = urllib.parse.quote('Студент добавлен')
         return RedirectResponse(url=f'/?tab=students&msg={notice}', status_code=303)
 
@@ -142,6 +147,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     ''',
                     (user_id, position, degree, capacity_val, requirements, interests),
                 )
+            refresh_supervisor_embedding(conn, user_id)
         notice = urllib.parse.quote('Руководитель добавлен')
         return RedirectResponse(url=f'/?tab=supervisors&msg={notice}', status_code=303)
 
@@ -314,6 +320,10 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 ''',
                 (full_name.strip(), (email or None), username_normalized, role, cp, cpr, user_id),
             )
+            if role == 'student':
+                refresh_student_embedding(conn, user_id)
+            elif role == 'supervisor':
+                refresh_supervisor_embedding(conn, user_id)
         kind = 'supervisors' if role == 'supervisor' else ('students' if role == 'student' else 'topics')
         notice = urllib.parse.quote('Пользователь обновлён')
         return RedirectResponse(url=f'/?tab={kind}&msg={notice}', status_code=303)
@@ -386,5 +396,6 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     ''',
                     (user_id, position, degree, capacity_val, interests, requirements),
                 )
+            refresh_supervisor_embedding(conn, user_id)
         notice = urllib.parse.quote('Руководитель обновлён')
         return RedirectResponse(url=f'/?tab=supervisors&msg={notice}', status_code=303)

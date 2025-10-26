@@ -28,6 +28,12 @@ from services.topic_import import (
     extract_telegram_username,
     process_cv,
 )
+from matching.embeddings import (
+    refresh_role_embedding,
+    refresh_student_embedding,
+    refresh_supervisor_embedding,
+    refresh_topic_embedding,
+)
 
 def _configure_logging() -> int:
     level_name = (os.getenv('LOG_LEVEL') or 'INFO').upper()
@@ -199,6 +205,7 @@ def _maybe_test_import():
                         """, (full_name, email, username),
                     )
                     user_id = cur.fetchone()[0]
+                    refresh_supervisor_embedding(conn, user_id)
                 # upsert supervisor profile
                 cur.execute('SELECT 1 FROM supervisor_profiles WHERE user_id=%s', (user_id,))
                 if cur.fetchone():
@@ -232,6 +239,7 @@ def _maybe_test_import():
                             (r.get('requirements') or None),
                         ),
                     )
+                refresh_supervisor_embedding(conn, user_id)
             # Topics
             for r in top_rows:
                 title = (r.get('title') or '').strip()
@@ -249,6 +257,7 @@ def _maybe_test_import():
                         (author_full_name,),
                     )
                     author_id = cur.fetchone()[0]
+                    refresh_supervisor_embedding(conn, author_id)
                 # check topic exists
                 cur.execute('SELECT 1 FROM topics WHERE author_user_id=%s AND title=%s', (author_id, title))
                 if cur.fetchone():
@@ -258,6 +267,7 @@ def _maybe_test_import():
                     INSERT INTO topics(author_user_id, title, description, expected_outcomes, required_skills,
                                        seeking_role, is_active, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, TRUE, now(), now())
+                    RETURNING id
                     """,
                     (
                         author_id,
@@ -268,6 +278,9 @@ def _maybe_test_import():
                         (r.get('seeking_role') or 'student'),
                     ),
                 )
+                topic_row = cur.fetchone()
+                if topic_row:
+                    refresh_topic_embedding(conn, topic_row[0])
     except Exception as e:
         print(f"TEST_IMPORT failed: {e}")
 
@@ -277,6 +290,7 @@ async def _startup_event():
     # Ensure new tables (lightweight migration for environments with existing DB)
     try:
         with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
             cur.execute(
                 '''
                 CREATE TABLE IF NOT EXISTS user_candidates (
@@ -309,6 +323,25 @@ async def _startup_event():
                 '''
             )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_roles_topic ON roles(topic_id)")
+            for tbl in ("users", "topics", "roles"):
+                try:
+                    cur.execute(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS embeddings VECTOR")
+                except Exception:
+                    pass
+                try:
+                    cur.execute(
+                        f"""
+                        ALTER TABLE {tbl}
+                        ALTER COLUMN embeddings
+                        TYPE VECTOR
+                        USING CASE
+                            WHEN embeddings IS NULL THEN NULL
+                            ELSE embeddings::vector
+                        END
+                        """
+                    )
+                except Exception:
+                    pass
             cur.execute(
                 '''
                 CREATE TABLE IF NOT EXISTS role_candidates (
@@ -685,9 +718,17 @@ def api_bind_telegram(user_id: int = Form(...), tg_id: Optional[str] = Form(None
                 is_confirmed=TRUE,
                 updated_at=now()
             WHERE id=%s
+            RETURNING role
             """,
             (tg_id_val, link, user_id),
         )
+        result = cur.fetchone()
+        if result:
+            role = result[0]
+            if role == 'student':
+                refresh_student_embedding(conn, user_id)
+            elif role == 'supervisor':
+                refresh_supervisor_embedding(conn, user_id)
         conn.commit()
     return {'status': 'ok'}
 
@@ -723,8 +764,10 @@ def api_self_register(
         uid = cur.fetchone()[0]
         if r == 'student':
             cur.execute("INSERT INTO student_profiles(user_id) VALUES (%s)", (uid,))
+            refresh_student_embedding(conn, uid)
         else:
             cur.execute("INSERT INTO supervisor_profiles(user_id) VALUES (%s)", (uid,))
+            refresh_supervisor_embedding(conn, uid)
         conn.commit()
     return {'status': 'ok', 'user_id': uid, 'role': r}
 
@@ -820,6 +863,7 @@ def api_update_student_profile(
                     workplace_val,
                 ),
             )
+        refresh_student_embedding(conn, user_id)
         conn.commit()
     return {'status': 'ok'}
 
@@ -892,6 +936,7 @@ def api_update_supervisor_profile(
                     requirements_val,
                 ),
             )
+        refresh_supervisor_embedding(conn, user_id)
         conn.commit()
     return {'status': 'ok'}
 
@@ -931,6 +976,7 @@ def api_add_topic(
             ''', (author_id_val, title_clean, description_val, expected_val, required_val, direction_val, seeking_role),
         )
         tid = cur.fetchone()[0]
+        refresh_topic_embedding(conn, tid)
         conn.commit()
     return {'status': 'ok', 'topic_id': tid}
 
@@ -973,6 +1019,7 @@ def api_add_role(
             ''', (topic_id, name_clean, description_val, required_val, capacity_val),
         )
         rid = cur.fetchone()[0]
+        refresh_role_embedding(conn, rid)
         conn.commit()
         logger.info(
             'api_add_role inserted role_id=%s for topic=%s (capacity=%s)',
@@ -1070,6 +1117,7 @@ def api_update_topic(
                 topic_id,
             ),
         )
+        refresh_topic_embedding(conn, topic_id)
         conn.commit()
     return {'status': 'ok', 'topic_id': topic_id}
 
@@ -1131,6 +1179,7 @@ def api_update_role(
                 role_id,
             ),
         )
+        refresh_role_embedding(conn, role_id)
         conn.commit()
     return {'status': 'ok', 'topic_id': row['topic_id']}
 
@@ -1580,6 +1629,7 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                         'UPDATE roles SET approved_student_user_id=%s WHERE id=%s',
                         (approved_student_id, msg.get('role_id')),
                     )
+                    refresh_role_embedding(conn, msg.get('role_id'))
                     needs_export = True
             else:
                 approved_supervisor_id = None
@@ -1594,6 +1644,7 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                         'UPDATE topics SET approved_supervisor_user_id=%s WHERE id=%s',
                         (approved_supervisor_id, msg.get('topic_id')),
                     )
+                    refresh_topic_embedding(conn, msg.get('topic_id'))
                     needs_export = True
         else:
             actor_id = responder_user_id if act == 'reject' else msg.get('sender_user_id')
@@ -1604,12 +1655,14 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                 row = cur.fetchone()
                 if row and row.get('approved_student_user_id') == actor_id:
                     cur.execute('UPDATE roles SET approved_student_user_id=NULL WHERE id=%s', (msg.get('role_id'),))
+                    refresh_role_embedding(conn, msg.get('role_id'))
                     needs_export = True
             elif not msg.get('role_id') and actor_role == 'supervisor' and actor_id:
                 cur.execute('SELECT approved_supervisor_user_id FROM topics WHERE id=%s', (msg.get('topic_id'),))
                 row = cur.fetchone()
                 if row and row.get('approved_supervisor_user_id') == actor_id:
                     cur.execute('UPDATE topics SET approved_supervisor_user_id=NULL WHERE id=%s', (msg.get('topic_id'),))
+                    refresh_topic_embedding(conn, msg.get('topic_id'))
                     needs_export = True
         conn.commit()
         msg['status'] = status
@@ -1634,6 +1687,7 @@ def api_clear_role_approved(role_id: int, by_user_id: int = Form(...)):
         if (approved_student_id is None) or (by_user_id not in (approved_student_id, author_id)):
             return {'status': 'error', 'message': 'not allowed'}
         cur.execute('UPDATE roles SET approved_student_user_id=NULL WHERE id=%s', (role_id,))
+        refresh_role_embedding(conn, role_id)
         conn.commit()
     sync_roles_sheet(get_conn)
     return {'status': 'ok'}
@@ -1650,6 +1704,7 @@ def api_clear_topic_supervisor(topic_id: int, by_user_id: int = Form(...)):
         if (approved_supervisor_id is None) or (by_user_id not in (approved_supervisor_id, author_id)):
             return {'status': 'error', 'message': 'not allowed'}
         cur.execute('UPDATE topics SET approved_supervisor_user_id=NULL WHERE id=%s', (topic_id,))
+        refresh_topic_embedding(conn, topic_id)
         conn.commit()
     sync_roles_sheet(get_conn)
     return {'status': 'ok'}

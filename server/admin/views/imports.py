@@ -13,6 +13,11 @@ from sheet_pairs import sync_roles_sheet
 
 from ..context import AdminContext
 from ..utils import normalize_telegram_link, process_cv
+from matching.embeddings import (
+    refresh_student_embedding,
+    refresh_supervisor_embedding,
+    refresh_topic_embedding,
+)
 
 _TOPIC_SPLIT_RE = re.compile(r"[\n;•‣●▪–—-]+|\s{2,}")
 
@@ -62,6 +67,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
             email = (r.get('email') or '').strip()
             if not (full_name or email):
                 continue
+            needs_student_refresh = False
 
             if email:
                 cur.execute(
@@ -87,6 +93,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                 )
                 user_id = cur.fetchone()[0]
                 inserted_users += 1
+                needs_student_refresh = True
 
             updates: List[str] = []
             params: List[Any] = []
@@ -106,6 +113,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                     f"UPDATE users SET {', '.join(updates)}, updated_at=now() WHERE id=%s",
                     tuple(params),
                 )
+                needs_student_refresh = True
 
             cur.execute('SELECT 1 FROM student_profiles WHERE user_id=%s', (user_id,))
             exists = cur.fetchone() is not None
@@ -152,6 +160,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                         user_id,
                     ),
                 )
+                needs_student_refresh = True
             else:
                 cur.execute(
                     '''
@@ -190,6 +199,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                         r.get('final_work_preference'),
                     ),
                 )
+                needs_student_refresh = True
             upserted_profiles += 1
 
             topic = r.get('topic')
@@ -213,6 +223,7 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                         INSERT INTO topics(author_user_id, title, description, expected_outcomes,
                                            required_skills, seeking_role, is_active, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, 'supervisor', TRUE, now(), now())
+                        RETURNING id
                         ''',
                         (
                             user_id,
@@ -222,7 +233,12 @@ def _import_students(ctx: AdminContext, spreadsheet_id: str, service_account_fil
                             skills_have,
                         ),
                     )
+                    topic_row = cur.fetchone()
+                    if topic_row:
+                        refresh_topic_embedding(conn, topic_row[0])
                     inserted_topics += 1
+            if needs_student_refresh:
+                refresh_student_embedding(conn, user_id)
 
     return inserted_users, upserted_profiles, inserted_topics
 
@@ -244,6 +260,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
             email = (r.get('email') or '').strip() or None
             if not (full_name or email):
                 continue
+            needs_supervisor_refresh = False
 
             if email:
                 cur.execute("SELECT id FROM users WHERE LOWER(email)=LOWER(%s) AND role='supervisor' LIMIT 1", (email,))
@@ -263,6 +280,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
                 )
                 user_id = cur.fetchone()[0]
                 inserted_users += 1
+                needs_supervisor_refresh = True
 
             updates: List[str] = []
             params: List[Any] = []
@@ -273,6 +291,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
             if updates:
                 params.append(user_id)
                 cur.execute(f"UPDATE users SET {', '.join(updates)}, updated_at=now() WHERE id=%s", tuple(params))
+                needs_supervisor_refresh = True
 
             cur.execute('SELECT 1 FROM supervisor_profiles WHERE user_id=%s', (user_id,))
             exists = cur.fetchone() is not None
@@ -287,6 +306,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
                     ''',
                     (interests, requirements, user_id),
                 )
+                needs_supervisor_refresh = True
             else:
                 cur.execute(
                     '''
@@ -295,6 +315,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
                     ''',
                     (user_id, None, None, None, interests, requirements),
                 )
+                needs_supervisor_refresh = True
             upserted_profiles += 1
 
             def insert_topics_from_text(raw_text: Optional[str], direction: Optional[int]) -> None:
@@ -314,6 +335,7 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
                         INSERT INTO topics(author_user_id, title, description, expected_outcomes,
                                            required_skills, direction, seeking_role, is_active, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s, 'student', TRUE, now(), now())
+                        RETURNING id
                         ''',
                         (
                             user_id,
@@ -324,6 +346,9 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
                             direction,
                         ),
                     )
+                    inserted_topic_row = cur.fetchone()
+                    if inserted_topic_row:
+                        refresh_topic_embedding(conn, inserted_topic_row[0])
                     inserted_topics += 1
 
             insert_topics_from_text(r.get('topics_09'), 9)
@@ -331,6 +356,8 @@ def _import_supervisors(ctx: AdminContext, spreadsheet_id: str, service_account_
             insert_topics_from_text(r.get('topics_45'), 45)
             if not any((r.get('topics_09'), r.get('topics_11'), r.get('topics_45'))):
                 insert_topics_from_text(r.get('topics_text'), None)
+            if needs_supervisor_refresh:
+                refresh_supervisor_embedding(conn, user_id)
 
     return inserted_users, upserted_profiles, inserted_topics
 

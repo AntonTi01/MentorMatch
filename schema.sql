@@ -4,6 +4,8 @@
 
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- =====================
 -- Users & Profiles
 -- =====================
@@ -16,7 +18,7 @@ CREATE TABLE users (
   username        TEXT,
   is_confirmed    BOOLEAN NOT NULL DEFAULT FALSE,
   role            VARCHAR(20) NOT NULL, -- 'student' | 'supervisor' | 'admin'
-  embeddings      TEXT,
+  embeddings      VECTOR,
   consent_personal BOOLEAN,
   consent_private  BOOLEAN,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -98,7 +100,7 @@ CREATE TABLE topics (
   required_skills   TEXT,
   direction         SMALLINT,                      -- 9 | 11 | 45 (опционально)
   seeking_role      VARCHAR(20) NOT NULL, -- 'student' | 'supervisor'
-  embeddings        TEXT,
+  embeddings        VECTOR,
   cover_media_id    BIGINT REFERENCES media_files(id) ON DELETE SET NULL,
   approved_supervisor_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   is_active         BOOLEAN NOT NULL DEFAULT TRUE,
@@ -153,6 +155,7 @@ CREATE TABLE roles (
   description     TEXT,
   required_skills TEXT,
   capacity        INTEGER,
+  embeddings      VECTOR,
   approved_student_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
