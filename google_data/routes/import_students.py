@@ -1,4 +1,3 @@
-"""FastAPI router handling student imports from Google Sheets."""
 from __future__ import annotations
 
 import os
@@ -9,12 +8,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from psycopg2.extensions import connection
 
-from .google_sheets import (
+from ..services.google_sheets import (
     ensure_service_account_file,
     google_tls_preflight,
     load_student_rows,
 )
-from .topic_import import import_students
+from ..workflows.topic_import import import_students
 
 
 class ImportSheetPayload(BaseModel):
@@ -23,9 +22,11 @@ class ImportSheetPayload(BaseModel):
     service_account_file: Optional[str] = None
 
 
+# Создает и настраивает роутер для импорта данных студентов
 def create_students_import_router(get_conn: Callable[[], connection]) -> APIRouter:
     router = APIRouter()
 
+    # Обрабатывает запрос на импорт студентов из Google Sheets
     @router.post("/api/import/students", response_class=JSONResponse)
     def import_sheet(payload: ImportSheetPayload):
         try:

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 
+# Определяет корректный путь к файлу сервисного аккаунта
 def resolve_service_account_path(path: Optional[str]) -> Optional[str]:
     if not path:
         return None

@@ -1,6 +1,3 @@
-﻿#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 from __future__ import annotations
 import os
 import re
@@ -12,18 +9,16 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 
-# ============
-# Normalizers
-# ============
 
+# Функция _simplify нормализует строку для сравнения
 def _simplify(s: str) -> str:
     s = (s or '').strip().lower()
-    # Keep latin/cyrillic letters and digits; collapse everything else to spaces
-    s = re.sub(r"[^a-zа-яё0-9]+", " ", s, flags=re.IGNORECASE)
+    s = re.sub(r"[^0-9a-z\u0430-\u044f\u0451]+", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"\s+", " ", s)
     return s.strip()
 
 
+# Функция _split_list разбивает строку на список значений
 def _split_list(s: str) -> Optional[List[str]]:
     if not s or not s.strip():
         return None
@@ -32,6 +27,7 @@ def _split_list(s: str) -> Optional[List[str]]:
     return parts or None
 
 
+# Функция _to_bool_ru приводит ответ к булевому значению
 def _to_bool_ru(s: str) -> Optional[bool]:
     v = (s or '').strip().lower()
     if not v:
@@ -45,6 +41,7 @@ def _to_bool_ru(s: str) -> Optional[bool]:
     return None
 
 
+# Функция _to_level_0_5 приводит значение к диапазону 0-5
 def _to_level_0_5(s: str) -> Optional[int]:
     v = (s or '').strip()
     if not v:
@@ -65,6 +62,7 @@ def _to_level_0_5(s: str) -> Optional[int]:
     return None
 
 
+# Функция _parse_timestamp нормализует метку времени
 def _parse_timestamp(ts: str) -> Optional[str]:
     if not ts:
         return None
@@ -76,6 +74,7 @@ def _parse_timestamp(ts: str) -> Optional[str]:
     return ts
 
 
+# Функция _extract_first_url ищет первую ссылку в тексте
 def _extract_first_url(s: str) -> Optional[str]:
     if not s:
         return None
@@ -83,6 +82,7 @@ def _extract_first_url(s: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+# Функция _extract_telegram_username достаёт логин Telegram
 def _extract_telegram_username(s: str) -> Optional[str]:
     if not s:
         return None
@@ -95,6 +95,7 @@ def _extract_telegram_username(s: str) -> Optional[str]:
     return re.sub(r"[^A-Za-z0-9_]", "", s) or None
 
 
+# Функция _format_telegram_link формирует ссылку на Telegram
 def _format_telegram_link(raw: Optional[str]) -> Optional[str]:
     """Вернуть ссылку вида https://t.me/<username> с учётом @ и неполных ссылок."""
     if not raw:
@@ -106,11 +107,7 @@ def _format_telegram_link(raw: Optional[str]) -> Optional[str]:
     return f"https://t.me/{username}" if username else None
 
 
-# =============================
-# Header aliases (student form)
-# =============================
 HEADER_ALIASES: Dict[str, List[str]] = {
-    # Блок 1
     'timestamp': ["отметка времени"],
     'email': ["адрес электронной почты", "email", "e-mail"],
     'full_name': ["введите фио", "фио", "фамилия имя отчество"],
@@ -130,28 +127,25 @@ HEADER_ALIASES: Dict[str, List[str]] = {
     'supervisor_pref': ["фио предполагаемого научного руководителя", "пожелания научного руководителя"],
     'has_own_topic': ["есть ли у вас предполагаемая тема для вкр"],
 
-    # Блок 2 (условный)
     'topic_title': ["название"],
     'topic_description': ["описание"],
     'topic_practical': ["практическая значимость"],
     'groundwork': ["имеющийся задел по теме", "задел по теме"],
     'topic_expected': ["ожидаемый результат", "ожидаемый результат по выполнении работы"],
 
-    # Блок 3
     'wants_team': ["планируете ли вы работать в команде"],
 
-    # Блок 4 (если Блок 3 не «нет»)
     'team_role': ["желаемая роль в команде"],
     'team_has': ["у вас уже есть в команде"],
     'team_needs': ["кто дополнительно требуется в команду"],
     'preferred_team_track': ["наиболее предпочтительный трек команды", "предпочтительный трек команды"],
 
-    # Согласия (опционально)
     'consent_private': ["согласие на обработку закрытых данных", "согласие закрытые", "согласие приват"],
     'consent_personal': ["согласие на обработку персональных данных", "согласие персональные"],
 }
 
 
+# Функция _build_col_index строит индекс колонок
 def _build_col_index(headers: List[str]) -> Dict[str, int]:
     idx_map: Dict[str, int] = {}
     sim = [_simplify(h) for h in headers]
@@ -169,18 +163,19 @@ def _build_col_index(headers: List[str]) -> Dict[str, int]:
     return idx_map
 
 
+# Функция _cell безопасно выбирает значение ячейки
 def _cell(row: List[str], j: Optional[int]) -> str:
     if j is None or j < 0:
         return ''
     return (row[j] or '').strip()
 
 
+# Функция _normalize_row нормализует запись студента
 def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
     hard_have = _cell(row, cols.get('hard_skills_have'))
     hard_want = _cell(row, cols.get('hard_skills_want'))
     interests = _cell(row, cols.get('interests'))
 
-    # Блок 2 — собственная тема студента
     topic: Dict[str, Optional[str]] = {
         'title': _cell(row, cols.get('topic_title')) or None,
         'description': _cell(row, cols.get('topic_description')) or None,
@@ -197,7 +192,6 @@ def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
     wants_team = _to_bool_ru(wants_team_raw)
     apply_master = _to_bool_ru(_cell(row, cols.get('apply_master')))
 
-    # Есть ли своя тема
     has_own_topic_raw = _cell(row, cols.get('has_own_topic'))
     has_own_topic = None
     if has_own_topic_raw:
@@ -209,7 +203,6 @@ def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
     elif any(topic.values()):
         has_own_topic = True
 
-    # Уровни треков 0..5
     dev_track = _to_level_0_5(_cell(row, cols.get('dev_track')))
     science_track = _to_level_0_5(_cell(row, cols.get('science_track')))
     startup_track = _to_level_0_5(_cell(row, cols.get('startup_track')))
@@ -247,21 +240,20 @@ def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
         'consent_private': consent_private,
     }
 
-    # Если Блок 4 заполнен, но ответ на Блок 3 не дан — считаем, что команда нужна
     if result['wants_team'] is None and any((result.get('team_role'), result.get('team_has'), result.get('team_needs'), result.get('preferred_team_track'))):
         result['wants_team'] = True
 
-    # Добавляем тему, если заполнены какие-то поля
     if any(v for k, v in topic.items() if k in ('title','description','expected_outcomes') and v):
         result['topic'] = topic
 
     return result
 
 
-# Select worksheet by name or by index
 
+# Функция _select_worksheet выбирает нужный лист
 def _select_worksheet(sh, sheet_name: Optional[str]):
     titles = [ws.title for ws in sh.worksheets()]
+    # Функция norm нормализует значение
     def norm(s: Optional[str]) -> str:
         return (s or '').strip().lower()
 
@@ -271,19 +263,17 @@ def _select_worksheet(sh, sheet_name: Optional[str]):
         except Exception:
             return sh.worksheets()[0]
 
-    # Exact match first
     for ws in sh.worksheets():
         if ws.title == sheet_name:
             return ws
-    # Case-insensitive match
     target = norm(sheet_name)
     for ws in sh.worksheets():
         if norm(ws.title) == target:
             return ws
-    # Fallback
     return sh.worksheets()[0]
 
 
+# Функция fetch_normalized_rows загружает строки студентов из Google Sheets
 def fetch_normalized_rows(
     spreadsheet_id: str,
     sheet_name: Optional[str],
@@ -308,23 +298,19 @@ def fetch_normalized_rows(
     return normalized
 
 
-# =============================
-# Supervisors (2nd sheet) parser
-# =============================
 
 SUP_HEADER_ALIASES: Dict[str, List[str]] = {
     'timestamp': ["отметка времени"],
     'email': ["адрес электронной почты", "email", "e-mail"],
     'full_name': ["фио", "введите фио"],
-    # Для совместимости оставляем общий ключ, если один столбец с темами
     'topics_text': ["перечень тем", "темы", "перечень тем для студентов", "предлагаемые темы"],
-    # Остальные поля
     'area': ["область научного интереса", "область интереса", "область"],
     'extra_info': ["дополнительная информация", "доп информация", "прочее"],
     'telegram': ["ник telegram", "введите ник telegram", "telegram", "телеграм"],
 }
 
 
+# Функция _build_col_index_sup строит индекс колонок для наставников
 def _build_col_index_sup(headers: List[str]) -> Dict[str, int]:
     idx_map: Dict[str, Any] = {}
     sim = [_simplify(h) for h in headers]
@@ -334,16 +320,12 @@ def _build_col_index_sup(headers: List[str]) -> Dict[str, int]:
                 idx_map[key] = i
                 break
 
-    # Дополнительно: собрать все столбцы с темами (например, 45/09/11 направления)
     topics_cols = []
     for i, h in enumerate(sim):
-        # Считаем тематическими любые столбцы, где встречаются 'темы'/'тематики' и 'вкр'
         if (('темы' in h or 'тематики' in h) and 'вкр' in h):
             topics_cols.append(i)
-            # Определяем направление по числам в заголовке
             if '45' in h:
                 idx_map['topics_45'] = i
-            # 09 иногда пишут как '09', '9', '09 го'
             if '09' in h or ' 9 ' in f' {h} ':
                 idx_map['topics_09'] = i
             if '11' in h:
@@ -360,11 +342,11 @@ def _build_col_index_sup(headers: List[str]) -> Dict[str, int]:
     return idx_map
 
 
+# Функция _normalize_supervisor_row нормализует запись наставника
 def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str, Any]:
     telegram_link = _format_telegram_link(_cell(row, cols.get('telegram')))
     area = _cell(row, cols.get('area')) or None
 
-    # Собираем темы из одного или нескольких столбцов
     parts: List[str] = []
     first = _cell(row, cols.get('topics_text')) if isinstance(cols.get('topics_text'), int) else ''
     if first:
@@ -372,7 +354,6 @@ def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str,
     multi = cols.get('topics_multi')
     if isinstance(multi, list):
         for i in multi:
-            # избегаем дублирования первой колонки
             if isinstance(cols.get('topics_text'), int) and i == cols.get('topics_text'):
                 continue
             val = _cell(row, i)
@@ -380,7 +361,6 @@ def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str,
                 parts.append(val)
     topics_text = '\n'.join([p for p in parts if p and p.strip()]) or None
 
-    # Отдельные поля по направлениям (если есть)
     topics_45 = _cell(row, cols.get('topics_45')) or None
     topics_09 = _cell(row, cols.get('topics_09')) or None
     topics_11 = _cell(row, cols.get('topics_11')) or None
@@ -401,6 +381,7 @@ def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str,
     }
 
 
+# Функция _select_worksheet_second выбирает запасной лист
 def _select_worksheet_second(sh) -> Any:
     try:
         wss = sh.worksheets()
@@ -411,6 +392,7 @@ def _select_worksheet_second(sh) -> Any:
         return sh.sheet1
 
 
+# Функция fetch_supervisor_rows загружает строки наставников из Google Sheets
 def fetch_supervisor_rows(
     spreadsheet_id: str,
     sheet_name: Optional[str] = None,

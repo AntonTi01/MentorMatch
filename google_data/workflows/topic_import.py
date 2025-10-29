@@ -1,4 +1,3 @@
-"""Utilities for importing students and supervisors from spreadsheets."""
 from __future__ import annotations
 
 import logging
@@ -7,22 +6,23 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from psycopg2.extensions import connection
 
-from .media_store import persist_media_from_url
-from .matching_client import (
+from ..services.media_store import persist_media_from_url
+from ..services.matching_client import (
     refresh_student_embedding,
     refresh_supervisor_embedding,
     refresh_topic_embedding,
 )
-from .topic_extraction import extract_topics_from_text, fallback_extract_topics
+from ..utils.topic_extraction import extract_topics_from_text, fallback_extract_topics
 
 logger = logging.getLogger(__name__)
 
 
+# Преобразует любые формы ссылок Telegram в нормализованный URL
 def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return None
     value = str(raw).strip()
-    if value.startswith("@"):  # Already username
+    if value.startswith("@"):
         value = value[1:]
     if value.lower().startswith(("http://t.me/", "https://t.me/", "http://telegram.me/", "https://telegram.me/")):
         return value
@@ -33,11 +33,12 @@ def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
     return f"https://t.me/{username}" if username else None
 
 
+# Извлекает имя пользователя Telegram без схемы и префиксов
 def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return None
     value = str(raw).strip()
-    if value.startswith("@"):  # Already username
+    if value.startswith("@"):
         value = value[1:]
     match = re.search(r"(?:https?://)?t(?:elegram)?\.me/([A-Za-z0-9_]+)", value)
     if match:
@@ -46,10 +47,12 @@ def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
     return username or None
 
 
+# Проверяет, является ли значение HTTP-ссылкой
 def _is_http_url(value: Optional[str]) -> bool:
     return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
 
 
+# Обрабатывает значение резюме и при необходимости сохраняет файл локально
 def process_cv(conn: connection, user_id: int, cv_value: Optional[str]) -> Optional[str]:
     value = (cv_value or "").strip()
     if not value:
@@ -60,12 +63,13 @@ def process_cv(conn: connection, user_id: int, cv_value: Optional[str]) -> Optio
         try:
             _, public_url = persist_media_from_url(conn, user_id, value, category="cv")
             return public_url
-        except Exception as exc:  # pragma: no cover - network failures are logged
+        except Exception as exc:
             logger.warning("Failed to download CV for user %s: %s", user_id, exc)
             return cv_value
     return cv_value
 
 
+# Объединяет элементы списка через запятую
 def _comma_join(items: Optional[Sequence[str]]) -> Optional[str]:
     if not items:
         return None
@@ -73,6 +77,7 @@ def _comma_join(items: Optional[Sequence[str]]) -> Optional[str]:
     return ", ".join(parts) or None
 
 
+# Импортирует студентов и их профили из набора строк
 def import_students(
     conn: connection,
     rows: Iterable[Dict[str, Any]],
@@ -266,7 +271,7 @@ def import_students(
         },
     }
 
-
+# Импортирует наставников и их темы из набора строк
 def import_supervisors(
     conn: connection,
     rows: Iterable[Dict[str, Any]],
@@ -353,6 +358,7 @@ def import_supervisors(
                 needs_supervisor_refresh = True
             upserted_profiles += 1
 
+            # Преобразует свободный текст в темы и сохраняет их в базе
             def _insert_from_text(text: Optional[str], direction: Optional[int]) -> None:
                 nonlocal inserted_topics
                 if not text or not text.strip():

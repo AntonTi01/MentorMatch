@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import psycopg2
 from psycopg2.extensions import connection
 
 
+# Формирует строку подключения к базе данных на основе переменных окружения
 def build_db_dsn() -> str:
     dsn = os.getenv("DATABASE_URL")
     if dsn:
@@ -19,6 +19,7 @@ def build_db_dsn() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 
+# Открывает новое соединение с базой данных PostgreSQL
 def get_conn() -> connection:
     return psycopg2.connect(build_db_dsn())
 

@@ -9,12 +9,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .db import get_conn
-from .import_students import create_students_import_router
-from .import_supervisors import create_supervisors_import_router
-from .sheet_pairs import sync_roles_sheet
+from .routes.import_students import create_students_import_router
+from .routes.import_supervisors import create_supervisors_import_router
+from .services.db import get_conn
+from .workflows.sheet_pairs import sync_roles_sheet
 
 
+# Настраивает уровень логирования сервиса google_data
 def _configure_logging() -> logging.Logger:
     level_name = (os.getenv("LOG_LEVEL") or "INFO").upper()
     logging.basicConfig(
@@ -38,11 +39,13 @@ class ExportPairsPayload(BaseModel):
 
 
 @app.get("/health", response_class=JSONResponse)
+# Возвращает информацию о готовности сервиса
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.post("/api/export/pairs", response_class=JSONResponse)
+# Выгружает пары ролей и тем в указанную таблицу Google
 def export_pairs(payload: ExportPairsPayload) -> JSONResponse:
     spreadsheet_id = (
         (payload.spreadsheet_id or "").strip()

@@ -1,14 +1,13 @@
-"""Wrappers around Google Sheets access used by import endpoints."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .parse_gform import fetch_normalized_rows, fetch_supervisor_rows
-from .utils import resolve_service_account_path
+from ..utils.parse_gform import fetch_normalized_rows, fetch_supervisor_rows
+from ..utils.utils import resolve_service_account_path
 
 
+# Проверяет существование файла сервисного аккаунта и возвращает путь
 def ensure_service_account_file(path: str) -> str:
     resolved = resolve_service_account_path(path)
     if not Path(resolved).exists():
@@ -16,16 +15,17 @@ def ensure_service_account_file(path: str) -> str:
     return resolved
 
 
+# Выполняет быстрый запрос к Google API для прогрева TLS
 def google_tls_preflight() -> None:
     try:
         import requests
 
         requests.get("https://www.googleapis.com/generate_204", timeout=5)
     except Exception:
-        # Silently ignore connectivity issues — actual request will raise later.
-        pass
+        return
 
 
+# Загружает строки со студентами из таблицы Google Sheets
 def load_student_rows(
     spreadsheet_id: str,
     *,
@@ -39,6 +39,7 @@ def load_student_rows(
     )
 
 
+# Загружает строки с наставниками из таблицы Google Sheets
 def load_supervisor_rows(
     spreadsheet_id: str,
     *,

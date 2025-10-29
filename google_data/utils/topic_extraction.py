@@ -1,10 +1,9 @@
-"""LLM-powered helpers for extracting topics from free-form text."""
 from __future__ import annotations
 
 import json
 import logging
-import re
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
@@ -17,16 +16,18 @@ LLM_TEMPERATURE = float(os.getenv("MATCHING_LLM_TEMPERATURE", "0.2"))
 logger = logging.getLogger(__name__)
 
 
+# Функция _create_openai_client обрабатывает данные тем
 def _create_openai_client() -> Optional[OpenAI]:
     if not (PROXY_API_KEY and PROXY_BASE_URL):
         return None
     try:
         return OpenAI(api_key=PROXY_API_KEY, base_url=PROXY_BASE_URL)
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except Exception as exc:
         logger.warning("Unable to create OpenAI client for topic extraction: %s", exc)
         return None
 
 
+# Функция extract_topics_from_text обрабатывает данные тем
 def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
     clean = (text or "").strip()
     if not clean:
@@ -38,7 +39,7 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
     functions = [
         {
             "name": "extract_topics",
-            "description": "Верни список тем с описанием и требуемыми навыками.",
+            "description": "Extract structured topics from free-form text",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -54,7 +55,6 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
                             },
                             "required": ["title"],
                         },
-                        "minItems": 1,
                     }
                 },
                 "required": ["topics"],
@@ -66,17 +66,16 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
         {
             "role": "system",
             "content": (
-                "Ты аналитик и помогаешь выделить темы для студентов."
-                " Найди самостоятельные темы, сформулируй короткое описание,"
-                " ожидаемые результаты и необходимые навыки. Отвечай по-русски."
+                "Выдели структурированные темы из входного текста. "
+                "Для каждой темы укажи краткое название, описание, ожидаемые результаты и необходимые навыки."
             ),
         },
         {
             "role": "user",
             "content": (
-                "Исходный текст анкеты:\n"
+                "Проанализируй текст ниже и верни список тем в формате функции extract_topics.\n\n"
                 f"{clean}\n\n"
-                "Вызови функцию extract_topics и передай список тем."
+                "Если темы выделить нельзя, верни пустой список topics."
             ),
         },
     ]
@@ -89,7 +88,7 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
             function_call={"name": "extract_topics"},
             temperature=LLM_TEMPERATURE,
         )
-    except Exception as exc:  # pragma: no cover - remote failure
+    except Exception as exc:
         logger.warning("Topic extraction request failed: %s", exc)
         return None
 
@@ -129,6 +128,7 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
     return normalised or None
 
 
+# Функция fallback_extract_topics обрабатывает данные тем
 def fallback_extract_topics(text: str) -> List[Dict[str, Any]]:
     if not text:
         return []
