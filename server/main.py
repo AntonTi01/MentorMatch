@@ -8,31 +8,19 @@ from urllib import error as urllib_error
 
 from fastapi import FastAPI, Form, Query, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
-from fastapi.templating import Jinja2Templates
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+from clients.google_data_client import sync_roles_sheet as trigger_roles_sheet_sync
+from embedding_queue import commit_with_refresh, enqueue_refresh
 from media_store import MEDIA_ROOT
 from utils import parse_optional_int, normalize_optional_str, resolve_service_account_path
 
-from admin import create_admin_router
-from sheet_pairs import sync_roles_sheet
-
-from api import (
-    create_matching_router,
-    create_students_import_router,
-    create_supervisors_import_router,
-)
+from matching_router import create_matching_router
 from services.topic_import import (
     normalize_telegram_link,
     extract_telegram_username,
     process_cv,
-)
-from matching.embeddings import (
-    refresh_role_embedding,
-    refresh_student_embedding,
-    refresh_supervisor_embedding,
-    refresh_topic_embedding,
 )
 
 def _configure_logging() -> int:
@@ -52,6 +40,20 @@ LOG_LEVEL = _configure_logging()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOG_LEVEL)
+
+
+def _sync_roles_sheet(
+    spreadsheet_id: Optional[str] = None,
+    service_account_file: Optional[str] = None,
+) -> bool:
+    try:
+        return trigger_roles_sheet_sync(
+            spreadsheet_id=spreadsheet_id,
+            service_account_file=service_account_file,
+        )
+    except Exception as exc:
+        logger.warning('Roles sheet sync request failed: %s', exc)
+        return False
 
 def build_db_dsn() -> str:
     dsn = os.getenv('DATABASE_URL')
@@ -148,12 +150,8 @@ def _send_telegram_notification(telegram_id: Optional[Any], text: str, *, button
 
 
 
-app = FastAPI(title='MentorMatch Admin MVP')
-templates = Jinja2Templates(directory=str((Path(__file__).parent.parent / 'templates').resolve()))
-app.include_router(create_admin_router(get_conn, templates))
-app.include_router(create_students_import_router(get_conn))
-app.include_router(create_supervisors_import_router(get_conn))
-app.include_router(create_matching_router(get_conn))
+app = FastAPI(title='MentorMatch Server Service')
+app.include_router(create_matching_router())
 
 def _truthy(val: Optional[str]) -> bool:
     return str(val or '').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
@@ -205,7 +203,7 @@ def _maybe_test_import():
                         """, (full_name, email, username),
                     )
                     user_id = cur.fetchone()[0]
-                    refresh_supervisor_embedding(conn, user_id)
+                    enqueue_refresh(conn, 'supervisor', user_id)
                 # upsert supervisor profile
                 cur.execute('SELECT 1 FROM supervisor_profiles WHERE user_id=%s', (user_id,))
                 if cur.fetchone():
@@ -239,7 +237,7 @@ def _maybe_test_import():
                             (r.get('requirements') or None),
                         ),
                     )
-                refresh_supervisor_embedding(conn, user_id)
+                enqueue_refresh(conn, 'supervisor', user_id)
             # Topics
             for r in top_rows:
                 title = (r.get('title') or '').strip()
@@ -257,7 +255,7 @@ def _maybe_test_import():
                         (author_full_name,),
                     )
                     author_id = cur.fetchone()[0]
-                    refresh_supervisor_embedding(conn, author_id)
+                    enqueue_refresh(conn, 'supervisor', author_id)
                 # check topic exists
                 cur.execute('SELECT 1 FROM topics WHERE author_user_id=%s AND title=%s', (author_id, title))
                 if cur.fetchone():
@@ -280,7 +278,8 @@ def _maybe_test_import():
                 )
                 topic_row = cur.fetchone()
                 if topic_row:
-                    refresh_topic_embedding(conn, topic_row[0])
+                    enqueue_refresh(conn, 'topic', topic_row[0])
+            commit_with_refresh(conn)
     except Exception as e:
         print(f"TEST_IMPORT failed: {e}")
 
@@ -427,11 +426,11 @@ async def _startup_event():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_user_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_user_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_topic ON messages(topic_id)")
-            conn.commit()
+            commit_with_refresh(conn)
     except Exception as e:
         print(f"Startup migration warning (user_candidates): {e}")
     _maybe_test_import()
-    sync_roles_sheet(get_conn)
+    _sync_roles_sheet()
 
 
 @app.get('/api/topics', response_class=JSONResponse)
@@ -726,10 +725,10 @@ def api_bind_telegram(user_id: int = Form(...), tg_id: Optional[str] = Form(None
         if result:
             role = result[0]
             if role == 'student':
-                refresh_student_embedding(conn, user_id)
+                enqueue_refresh(conn, 'student', user_id)
             elif role == 'supervisor':
-                refresh_supervisor_embedding(conn, user_id)
-        conn.commit()
+                enqueue_refresh(conn, 'supervisor', user_id)
+        commit_with_refresh(conn)
     return {'status': 'ok'}
 
 
@@ -764,11 +763,11 @@ def api_self_register(
         uid = cur.fetchone()[0]
         if r == 'student':
             cur.execute("INSERT INTO student_profiles(user_id) VALUES (%s)", (uid,))
-            refresh_student_embedding(conn, uid)
+            enqueue_refresh(conn, 'student', uid)
         else:
             cur.execute("INSERT INTO supervisor_profiles(user_id) VALUES (%s)", (uid,))
-            refresh_supervisor_embedding(conn, uid)
-        conn.commit()
+            enqueue_refresh(conn, 'supervisor', uid)
+        commit_with_refresh(conn)
     return {'status': 'ok', 'user_id': uid, 'role': r}
 
 
@@ -863,8 +862,8 @@ def api_update_student_profile(
                     workplace_val,
                 ),
             )
-        refresh_student_embedding(conn, user_id)
-        conn.commit()
+        enqueue_refresh(conn, 'student', user_id)
+        commit_with_refresh(conn)
     return {'status': 'ok'}
 
 
@@ -936,8 +935,8 @@ def api_update_supervisor_profile(
                     requirements_val,
                 ),
             )
-        refresh_supervisor_embedding(conn, user_id)
-        conn.commit()
+        enqueue_refresh(conn, 'supervisor', user_id)
+        commit_with_refresh(conn)
     return {'status': 'ok'}
 
 
@@ -976,8 +975,8 @@ def api_add_topic(
             ''', (author_id_val, title_clean, description_val, expected_val, required_val, direction_val, seeking_role),
         )
         tid = cur.fetchone()[0]
-        refresh_topic_embedding(conn, tid)
-        conn.commit()
+        enqueue_refresh(conn, 'topic', tid)
+        commit_with_refresh(conn)
     return {'status': 'ok', 'topic_id': tid}
 
 
@@ -1019,15 +1018,15 @@ def api_add_role(
             ''', (topic_id, name_clean, description_val, required_val, capacity_val),
         )
         rid = cur.fetchone()[0]
-        refresh_role_embedding(conn, rid)
-        conn.commit()
+        enqueue_refresh(conn, 'role', rid)
+        commit_with_refresh(conn)
         logger.info(
             'api_add_role inserted role_id=%s for topic=%s (capacity=%s)',
             rid,
             topic_id,
             capacity_val,
         )
-    sync_result = sync_roles_sheet(get_conn)
+    sync_result = _sync_roles_sheet()
     logger.info('api_add_role: roles sheet sync triggered=%s', sync_result)
     return {'status': 'ok', 'role_id': rid}
 
@@ -1117,8 +1116,8 @@ def api_update_topic(
                 topic_id,
             ),
         )
-        refresh_topic_embedding(conn, topic_id)
-        conn.commit()
+        enqueue_refresh(conn, 'topic', topic_id)
+        commit_with_refresh(conn)
     return {'status': 'ok', 'topic_id': topic_id}
 
 
@@ -1179,8 +1178,8 @@ def api_update_role(
                 role_id,
             ),
         )
-        refresh_role_embedding(conn, role_id)
-        conn.commit()
+        enqueue_refresh(conn, 'role', role_id)
+        commit_with_refresh(conn)
     return {'status': 'ok', 'topic_id': row['topic_id']}
 
 
@@ -1300,6 +1299,24 @@ def api_user_candidates(user_id: int, limit: int = Query(5, ge=1, le=50)):
             )
         rows = cur.fetchall()
         return [dict(r) for r in rows]
+
+
+@app.get('/api/roles/stats', response_class=JSONResponse)
+def api_roles_stats():
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            '''
+            SELECT
+                COUNT(*)::INT AS total_roles,
+                COUNT(*) FILTER (WHERE r.approved_student_user_id IS NULL)::INT AS available_roles
+            FROM roles r
+            JOIN topics t ON t.id = r.topic_id
+            WHERE t.is_active = TRUE
+            '''
+        )
+        row = cur.fetchone() or (0, 0)
+    total, available = row
+    return {'total': total or 0, 'available': available or 0}
 
 
 @app.get('/api/roles/{role_id}', response_class=JSONResponse)
@@ -1527,7 +1544,7 @@ def api_messages_send(
                 msg_id = msg_id_raw
             else:
                 message_ctx = _fetch_message_context(cur, msg_id)
-        conn.commit()
+        commit_with_refresh(conn)
     if message_ctx:
         _notify_new_application(message_ctx)
     return {'status': 'ok', 'message_id': msg_id}
@@ -1629,7 +1646,7 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                         'UPDATE roles SET approved_student_user_id=%s WHERE id=%s',
                         (approved_student_id, msg.get('role_id')),
                     )
-                    refresh_role_embedding(conn, msg.get('role_id'))
+                    enqueue_refresh(conn, 'role', msg.get('role_id'))
                     needs_export = True
             else:
                 approved_supervisor_id = None
@@ -1644,7 +1661,7 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                         'UPDATE topics SET approved_supervisor_user_id=%s WHERE id=%s',
                         (approved_supervisor_id, msg.get('topic_id')),
                     )
-                    refresh_topic_embedding(conn, msg.get('topic_id'))
+                    enqueue_refresh(conn, 'topic', msg.get('topic_id'))
                     needs_export = True
         else:
             actor_id = responder_user_id if act == 'reject' else msg.get('sender_user_id')
@@ -1655,23 +1672,23 @@ def api_messages_respond(message_id: int = Form(...), responder_user_id: int = F
                 row = cur.fetchone()
                 if row and row.get('approved_student_user_id') == actor_id:
                     cur.execute('UPDATE roles SET approved_student_user_id=NULL WHERE id=%s', (msg.get('role_id'),))
-                    refresh_role_embedding(conn, msg.get('role_id'))
+                    enqueue_refresh(conn, 'role', msg.get('role_id'))
                     needs_export = True
             elif not msg.get('role_id') and actor_role == 'supervisor' and actor_id:
                 cur.execute('SELECT approved_supervisor_user_id FROM topics WHERE id=%s', (msg.get('topic_id'),))
                 row = cur.fetchone()
                 if row and row.get('approved_supervisor_user_id') == actor_id:
                     cur.execute('UPDATE topics SET approved_supervisor_user_id=NULL WHERE id=%s', (msg.get('topic_id'),))
-                    refresh_topic_embedding(conn, msg.get('topic_id'))
+                    enqueue_refresh(conn, 'topic', msg.get('topic_id'))
                     needs_export = True
-        conn.commit()
+        commit_with_refresh(conn)
         msg['status'] = status
         msg['answer'] = answer or None
         notify_ctx = msg
     if notify_ctx:
         _notify_application_update(notify_ctx, act)
     if needs_export:
-        sync_roles_sheet(get_conn)
+        _sync_roles_sheet()
     return {'status': 'ok'}
 
 
@@ -1687,9 +1704,9 @@ def api_clear_role_approved(role_id: int, by_user_id: int = Form(...)):
         if (approved_student_id is None) or (by_user_id not in (approved_student_id, author_id)):
             return {'status': 'error', 'message': 'not allowed'}
         cur.execute('UPDATE roles SET approved_student_user_id=NULL WHERE id=%s', (role_id,))
-        refresh_role_embedding(conn, role_id)
-        conn.commit()
-    sync_roles_sheet(get_conn)
+        enqueue_refresh(conn, 'role', role_id)
+        commit_with_refresh(conn)
+    _sync_roles_sheet()
     return {'status': 'ok'}
 
 
@@ -1704,9 +1721,9 @@ def api_clear_topic_supervisor(topic_id: int, by_user_id: int = Form(...)):
         if (approved_supervisor_id is None) or (by_user_id not in (approved_supervisor_id, author_id)):
             return {'status': 'error', 'message': 'not allowed'}
         cur.execute('UPDATE topics SET approved_supervisor_user_id=NULL WHERE id=%s', (topic_id,))
-        refresh_topic_embedding(conn, topic_id)
-        conn.commit()
-    sync_roles_sheet(get_conn)
+        enqueue_refresh(conn, 'topic', topic_id)
+        commit_with_refresh(conn)
+    _sync_roles_sheet()
     return {'status': 'ok'}
 
 

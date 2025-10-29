@@ -8,11 +8,10 @@ import psycopg2.extras
 from fastapi import APIRouter, Request, Body
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from sheet_pairs import sync_roles_sheet
-from utils import parse_optional_int
-
+from ..clients.google_data_client import sync_roles_sheet
 from ..context import AdminContext
-from matching.embeddings import refresh_role_embedding, refresh_topic_embedding
+from ..embedding_queue import enqueue_refresh, commit_with_refresh
+from ..utils_common import parse_optional_int
 
 PAGE_LIMIT = 20
 
@@ -265,7 +264,7 @@ def _apply_assignment_updates(
                     (student_id, role_id),
                 )
                 updated_roles += 1
-                refresh_role_embedding(conn, role_id)
+                enqueue_refresh(conn, "role", role_id)
 
             for topic_id, supervisor_id in topic_updates.items():
                 cur.execute(
@@ -289,10 +288,10 @@ def _apply_assignment_updates(
                     (supervisor_id, topic_id),
                 )
                 updated_topics += 1
-                refresh_topic_embedding(conn, topic_id)
-            conn.commit()
+                enqueue_refresh(conn, "topic", topic_id)
+            commit_with_refresh(conn)
 
-    sheet_synced = sync_roles_sheet(ctx.get_conn)
+    sheet_synced = sync_roles_sheet()
     msg_parts = [
         f"обновлено ролей: {updated_roles}",
         f"обновлено руководителей: {updated_topics}",

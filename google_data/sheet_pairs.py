@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import os
 from typing import Any, Callable, List, Optional
@@ -6,8 +7,10 @@ from typing import Any, Callable, List, Optional
 import gspread
 from google.oauth2.service_account import Credentials
 
-from utils import resolve_service_account_path
+from .utils import resolve_service_account_path
 
+
+logger = logging.getLogger(__name__)
 
 HEADERS_RU = ['Тема', 'Роль', 'Студент', 'Руководитель']
 
@@ -76,10 +79,6 @@ def export_pairs_from_db(conn, spreadsheet_id: str, service_account_file: str) -
     return data_rows
 
 
-
-logger = logging.getLogger(__name__)
-
-
 def sync_roles_sheet(
     get_conn: Callable[[], Any],
     spreadsheet_id: Optional[str] = None,
@@ -125,4 +124,6 @@ def sync_roles_sheet(
         )
         return False
 
+
+__all__ = ['sync_roles_sheet', 'HEADERS_RU']
 

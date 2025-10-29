@@ -7,15 +7,10 @@ import psycopg2.extras
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from sheet_pairs import sync_roles_sheet
-from utils import parse_optional_int
-
+from ..clients.google_data_client import sync_roles_sheet
 from ..context import AdminContext
-from matching.embeddings import (
-    refresh_role_embedding,
-    refresh_supervisor_embedding,
-    refresh_topic_embedding,
-)
+from ..embedding_queue import enqueue_refresh, commit_with_refresh
+from ..utils_common import parse_optional_int
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
     templates = ctx.templates
@@ -65,7 +60,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                         (author_full_name,),
                     )
                     uid = cur.fetchone()[0]
-                    refresh_supervisor_embedding(conn, uid)
+                    enqueue_refresh(conn, "supervisor", uid)
             if uid is None:
                 notice = urllib.parse.quote('Укажите автора темы')
                 return RedirectResponse(url=f'/add-topic?msg={notice}', status_code=303)
@@ -96,7 +91,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 inserted = cur.fetchone()
                 if inserted:
                     topic_id_created = inserted[0]
-                    refresh_topic_embedding(conn, topic_id_created)
+                    enqueue_refresh(conn, "topic", topic_id_created)
         notice = urllib.parse.quote('Тема добавлена')
         return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
 
@@ -177,7 +172,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                     topic_id,
                 ),
             )
-            refresh_topic_embedding(conn, topic_id)
+            enqueue_refresh(conn, "topic", topic_id)
         notice = urllib.parse.quote('Тема обновлена')
         return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
 
@@ -287,7 +282,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
             new_role_row = cur.fetchone()
             if new_role_row:
                 refresh_role_embedding(conn, new_role_row[0])
-        sync_roles_sheet(ctx.get_conn)
+        sync_roles_sheet()
         notice = urllib.parse.quote('Роль добавлена')
         return RedirectResponse(url=f'/topic/{topic_id}?msg={notice}', status_code=303)
 
@@ -351,8 +346,8 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 notice = urllib.parse.quote('???? ?? ???????')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
             topic_id_value = row[0]
-            refresh_role_embedding(conn, role_id)
-        sync_roles_sheet(ctx.get_conn)
+            enqueue_refresh(conn, "role", role_id)
+        sync_roles_sheet()
         notice = urllib.parse.quote('???? ?????????')
         return RedirectResponse(url=f'/topic/{topic_id_value}?msg={notice}', status_code=303)
 
@@ -365,7 +360,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 notice = urllib.parse.quote('???? ?? ???????')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
             topic_id_value = row[0]
-        sync_roles_sheet(ctx.get_conn)
+        sync_roles_sheet()
         notice = urllib.parse.quote('???? ???????')
         return RedirectResponse(url=f'/topic/{topic_id_value}?msg={notice}', status_code=303)
 
@@ -431,5 +426,5 @@ def _ensure_author(ctx: AdminContext, author_user_id: Optional[str], author_full
             (author_full_name.strip(),),
         )
         new_id = cur.fetchone()[0]
-        refresh_supervisor_embedding(conn, new_id)
+        enqueue_refresh(conn, "supervisor", new_id)
         return new_id

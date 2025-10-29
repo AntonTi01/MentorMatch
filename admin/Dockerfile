@@ -10,14 +10,14 @@ RUN find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i
     && apt-get install -y --no-install-recommends build-essential libpq-dev curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY server/requirements.txt ./requirements.txt
+COPY admin/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY server /app
+COPY admin /app/admin
 
 ENV PYTHONPATH=/app
 
-EXPOSE 8000
+EXPOSE 8100
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "admin.main:app", "--host", "0.0.0.0", "--port", "8100"]

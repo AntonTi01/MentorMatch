@@ -46,6 +46,9 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
             ]
             text = "Админ‑меню: выберите раздел"
+            stats_line = await self._roles_stats_line()
+            if stats_line:
+                text = f"{text}\n\n{stats_line}"
             if update.message:
                 await update.message.reply_text(
                     self._fix_text(text), reply_markup=self._mk(kb)
@@ -146,6 +149,11 @@ class MenuHandlers(BaseHandlers):
         uid = context.user_data.get("uid")
         context.user_data.pop("student_match_back", None)
         if role == "student":
+            browse_rows = [
+                [InlineKeyboardButton("👨‍🎓 Студенты", callback_data="list_students")],
+                [InlineKeyboardButton("🧑‍🏫 Научные руководители", callback_data="list_supervisors")],
+                [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
+            ]
             kb = [
                 [InlineKeyboardButton("👤 Мой профиль", callback_data="student_me")],
                 [InlineKeyboardButton("📚 Мои темы", callback_data="my_topics")],
@@ -158,8 +166,17 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📥 Входящие заявки", callback_data="messages_inbox")],
                 [InlineKeyboardButton("📤 Мои заявки", callback_data="messages_outbox")],
             ]
+            kb[1:1] = browse_rows
             text = "Студент: выберите действие"
+            stats_line = await self._roles_stats_line()
+            if stats_line:
+                text = f"{text}\n\n{stats_line}"
         else:
+            browse_rows = [
+                [InlineKeyboardButton("👨‍🎓 Студенты", callback_data="list_students")],
+                [InlineKeyboardButton("🧑‍🏫 Научные руководители", callback_data="list_supervisors")],
+                [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
+            ]
             kb = [
                 [InlineKeyboardButton("👤 Мой профиль", callback_data="supervisor_me")],
                 [InlineKeyboardButton("📚 Мои темы", callback_data="my_topics")],
@@ -172,6 +189,7 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📥 Входящие заявки", callback_data="messages_inbox")],
                 [InlineKeyboardButton("📤 Мои заявки", callback_data="messages_outbox")],
             ]
+            kb[1:1] = browse_rows
             text = "Научный руководитель: выберите действие"
         if update.callback_query:
             await update.callback_query.edit_message_text(
@@ -181,6 +199,17 @@ class MenuHandlers(BaseHandlers):
             await update.message.reply_text(
                 self._fix_text(text), reply_markup=self._mk(kb)
             )
+
+    async def _roles_stats_line(self) -> Optional[str]:
+        stats = await self._api_get("/api/roles/stats") or {}
+        if not isinstance(stats, dict):
+            return None
+        try:
+            total = int(stats.get("total", 0))
+            available = int(stats.get("available", 0))
+        except (TypeError, ValueError):
+            return None
+        return f"Осталось свободных ролей {available}/{total}"
 
     async def cb_back(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("messages_cache", None)

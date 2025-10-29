@@ -1,0 +1,45 @@
+"""Router exposing matching actions for administrators."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Form
+from fastapi.responses import JSONResponse
+
+from clients.matching_client import (
+    match_role as trigger_match_role,
+    match_student as trigger_match_student,
+    match_supervisor as trigger_match_supervisor,
+    match_topic as trigger_match_topic,
+)
+
+
+def create_matching_router() -> APIRouter:
+    router = APIRouter()
+
+    @router.post("/match-topic", response_class=JSONResponse)
+    def match_topic(topic_id: int = Form(...), target_role: str = Form("student")):
+        result = trigger_match_topic(topic_id, target_role=target_role)
+        status = 200 if result.get("status") == "ok" else 400
+        return JSONResponse(result, status_code=status)
+
+    @router.post("/match-student", response_class=JSONResponse)
+    def match_student(student_user_id: int = Form(...)):
+        result = trigger_match_student(student_user_id)
+        status = 200 if result.get("status") == "ok" else 400
+        return JSONResponse(result, status_code=status)
+
+    @router.post("/match-supervisor", response_class=JSONResponse)
+    def match_supervisor(supervisor_user_id: int = Form(...)):
+        result = trigger_match_supervisor(supervisor_user_id)
+        status = 200 if result.get("status") == "ok" else 400
+        return JSONResponse(result, status_code=status)
+
+    @router.post("/match-role", response_class=JSONResponse)
+    def match_role(role_id: int = Form(...)):
+        result = trigger_match_role(role_id)
+        status = 200 if result.get("status") == "ok" else 400
+        return JSONResponse(result, status_code=status)
+
+    return router
+
+
+__all__ = ["create_matching_router"]

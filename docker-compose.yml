@@ -2,54 +2,136 @@ version: "3.9"
 
 services:
   server:
-      build: ./server
-      ports:
-        - "8000:8000"
-      healthcheck:
-        test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')\""]
-        interval: 10s
-        timeout: 5s
-        retries: 5
-        start_period: 180s
-      environment:
-        - TEST_IMPORT=${TEST_IMPORT}
-        - PROXY_API_KEY=${PROXY_API_KEY}
-        - PROXY_BASE_URL=${PROXY_BASE_URL}
-        - PROXY_MODEL=${PROXY_MODEL:-gpt-4o-mini}
-        - EMBEDDING_MODELS_DIR=/data/embedding-models
-        - POSTGRES_USER=${POSTGRES_USER}
-        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-        - POSTGRES_DB=${POSTGRES_DB}
-        - POSTGRES_HOST=${POSTGRES_HOST}
-        - POSTGRES_PORT=${POSTGRES_PORT}
-        - DATABASE_URL=${DATABASE_URL}
-        - SPREADSHEET_ID=${SPREADSHEET_ID}
-        - SERVICE_ACCOUNT_FILE=${SERVICE_ACCOUNT_FILE}
-        - PAIRS_SPREADSHEET_ID=${PAIRS_SPREADSHEET_ID}
-        - SERVER_URL=${SERVER_URL}
-        - BOT_API_URL=${BOT_API_URL:-http://bot:5000}
-        - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      volumes:
-        - ./server:/app
-        - ./templates:/templates
-      depends_on:
-        - postgres
-      restart: unless-stopped
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      MATCHING_SERVICE_URL: http://matching:8300
+      GOOGLE_DATA_SERVICE_URL: http://google_data:8200
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      BOT_API_URL: ${BOT_API_URL:-http://bot:5000}
+      SPREADSHEET_ID: ${SPREADSHEET_ID:-}
+      SERVICE_ACCOUNT_FILE: ${SERVICE_ACCOUNT_FILE:-service-account.json}
+      PAIRS_SPREADSHEET_ID: ${PAIRS_SPREADSHEET_ID:-}
+    volumes:
+      - ./server:/app
+      - ./data/media:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      matching:
+        condition: service_started
+      google_data:
+        condition: service_started
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      MATCHING_SERVICE_URL: http://matching:8300
+      GOOGLE_DATA_SERVICE_URL: http://google_data:8200
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SPREADSHEET_ID: ${SPREADSHEET_ID:-}
+      SERVICE_ACCOUNT_FILE: ${SERVICE_ACCOUNT_FILE:-service-account.json}
+    volumes:
+      - ./admin:/app/admin
+      - ./data/media:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      matching:
+        condition: service_started
+      google_data:
+        condition: service_started
+    restart: unless-stopped
+
+  google_data:
+    build:
+      context: .
+      dockerfile: google_data/Dockerfile
+    ports:
+      - "8200:8200"
+    environment:
+      MATCHING_SERVICE_URL: http://matching:8300
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL:-}
+      SERVICE_ACCOUNT_FILE: ${SERVICE_ACCOUNT_FILE:-service-account.json}
+      PROXY_API_KEY: ${PROXY_API_KEY:-}
+      PROXY_BASE_URL: ${PROXY_BASE_URL:-}
+      PROXY_MODEL: ${PROXY_MODEL:-gpt-4o-mini}
+      SPREADSHEET_ID: ${SPREADSHEET_ID:-}
+      PAIRS_SPREADSHEET_ID: ${PAIRS_SPREADSHEET_ID:-}
+    volumes:
+      - ./google_data:/app/google_data
+      - ./data/media:/data/media
+      - ./google_data/service-account.json:/app/google_data/service-account.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  matching:
+    build:
+      context: .
+      dockerfile: matching/Dockerfile
+    ports:
+      - "8300:8300"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL:-}
+      PROXY_API_KEY: ${PROXY_API_KEY:-}
+      PROXY_BASE_URL: ${PROXY_BASE_URL:-}
+      PROXY_MODEL: ${PROXY_MODEL:-gpt-4o-mini}
+      MATCHING_LLM_TEMPERATURE: ${MATCHING_LLM_TEMPERATURE:-0.2}
+      EMBEDDING_MODELS_DIR: /app/matching/models
+    volumes:
+      - ./matching:/app/matching
+      - ./data/media:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   bot:
-      build: ./bot
-      ports:
-        - 5000:5000
-      environment:
-        - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-        - SERVER_URL=http://server:8000
-      volumes:
-        - ./bot:/app/bot
-        - ./templates:/app/templates:ro
-      depends_on:
-        server:
-          condition: service_healthy
-      restart: unless-stopped 
+    build: ./bot
+    ports:
+      - "5000:5000"
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      SERVER_URL: http://server:8000
+    volumes:
+      - ./bot:/app/bot
+      - ./templates:/app/templates:ro
+    depends_on:
+      server:
+        condition: service_started
+    restart: unless-stopped
 
   postgres:
     image: ankane/pgvector
@@ -82,7 +164,7 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-
 volumes:
   pgdata:
   pgadmin_data:
+

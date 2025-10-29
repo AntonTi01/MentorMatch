@@ -4,11 +4,15 @@ from __future__ import annotations
 import json
 import logging
 import re
+import os
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
 
-from matching.settings import LLM_TEMPERATURE, PROXY_API_KEY, PROXY_BASE_URL, PROXY_MODEL
+PROXY_API_KEY = os.getenv("PROXY_API_KEY")
+PROXY_BASE_URL = os.getenv("PROXY_BASE_URL")
+PROXY_MODEL = os.getenv("PROXY_MODEL", "gpt-4o-mini")
+LLM_TEMPERATURE = float(os.getenv("MATCHING_LLM_TEMPERATURE", "0.2"))
 
 logger = logging.getLogger(__name__)
 

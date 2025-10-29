@@ -1,4 +1,4 @@
-"""Entity and profile handlers."""
+﻿"""Entity and profile handlers."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -140,12 +140,9 @@ class EntityHandlers(BaseHandlers):
             await q.edit_message_text(self._fix_text('Не удалось загрузить профиль студента'))
             return
         viewer_id = context.user_data.get('uid')
-        can_edit = self._is_admin(update)
-        if not can_edit and viewer_id is not None and sid is not None:
-            try:
-                can_edit = int(viewer_id) == int(sid)
-            except Exception:
-                can_edit = viewer_id == sid
+        is_admin = self._is_admin(update)
+        is_self = self._ids_equal(viewer_id, sid)
+        can_edit = is_admin or is_self
         # Header
         lines = [
             f"Студент: {s.get('full_name','–')}",
@@ -174,7 +171,8 @@ class EntityHandlers(BaseHandlers):
         kb: List[List[InlineKeyboardButton]] = []
         if can_edit:
             kb.append([InlineKeyboardButton('✏️ Редактировать профиль', callback_data=f'edit_student_{sid}')])
-        kb.append([InlineKeyboardButton('🧠 Подобрать роль', callback_data=f'match_student_{sid}')])
+        if is_admin or is_self:
+            kb.append([InlineKeyboardButton('🧠 Подобрать роль', callback_data=f'match_student_{sid}')])
         kb.append([InlineKeyboardButton('⬅️ Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
@@ -226,12 +224,9 @@ class EntityHandlers(BaseHandlers):
             await q.edit_message_text(self._fix_text('Не удалось загрузить профиль научного руководителя'))
             return
         viewer_id = context.user_data.get('uid')
-        can_edit = self._is_admin(update)
-        if not can_edit and viewer_id is not None and uid is not None:
-            try:
-                can_edit = int(viewer_id) == int(uid)
-            except Exception:
-                can_edit = viewer_id == uid
+        is_admin = self._is_admin(update)
+        is_self = self._ids_equal(viewer_id, uid)
+        can_edit = is_admin or is_self
         lines = [
             f"Научный руководитель: {s.get('full_name','–')}",
             f"Username: {s.get('username') or '–'}",
@@ -252,13 +247,14 @@ class EntityHandlers(BaseHandlers):
         kb: List[List[InlineKeyboardButton]] = []
         if can_edit:
             kb.append([InlineKeyboardButton('✏️ Редактировать профиль', callback_data=f'edit_supervisor_{uid}')])
-        kb.append([InlineKeyboardButton('🧠 Подобрать тему', callback_data=f'match_topics_for_supervisor_{uid}')])
+        if is_admin or is_self:
+            kb.append([InlineKeyboardButton('🧠 Подобрать тему', callback_data=f'match_topics_for_supervisor_{uid}')])
         invite_ctx = context.user_data.get('supervisor_invite_context') or {}
         topic_id_for_invite = invite_ctx.get('topic_id')
         supervisor_ids = {str(x) for x in (invite_ctx.get('supervisor_ids') or [])}
         can_invite = False
         if topic_id_for_invite and str(uid) in supervisor_ids:
-            if self._is_admin(update):
+            if is_admin:
                 can_invite = True
             else:
                 viewer_id = context.user_data.get('uid')
@@ -333,8 +329,9 @@ class EntityHandlers(BaseHandlers):
         author_id = t.get('author_user_id')
         uid = context.user_data.get('uid')
         viewer_role_name = self._normalize_role_value(context.user_data.get('role')) or ''
+        is_admin = self._is_admin(update)
         can_add_role = False
-        if self._is_admin(update):
+        if is_admin:
             can_add_role = True
         elif uid is not None and author_id is not None:
             try:
@@ -379,7 +376,8 @@ class EntityHandlers(BaseHandlers):
         if can_apply_topic:
             apply_text = '📨 Подать заявку на тему' if target_role == 'student' else '📨 Откликнуться на тему'
             kb.append([InlineKeyboardButton(apply_text, callback_data=f'apply_topic_{tid}')])
-        kb.append([InlineKeyboardButton('🧑‍🏫 Подобрать научного руководителя', callback_data=f'match_supervisor_{tid}')])
+        if is_admin:
+            kb.append([InlineKeyboardButton('🧑‍🏫 Подобрать научного руководителя', callback_data=f'match_supervisor_{tid}')])
         kb.append([InlineKeyboardButton('⬅️ Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text('\n'.join(lines2)), reply_markup=self._mk(kb))
 
@@ -1996,4 +1994,6 @@ class EntityHandlers(BaseHandlers):
         await update.message.reply_text(
             self._fix_text('Роль обновлена.'), reply_markup=self._mk(kb)
         )
+
+
 

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import os
 import mimetypes
+import os
 import re
-import uuid
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -18,23 +17,23 @@ def _ensure_media_root() -> Path:
 
 
 def _normalize_drive_url(url: str) -> str:
-    m = re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
-    if m:
-        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
-    m = re.search(r"/file/d/([A-Za-z0-9_-]+)/", url)
-    if m:
-        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    match = re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
+    if match:
+        return f"https://drive.google.com/uc?export=download&id={match.group(1)}"
+    match = re.search(r"/file/d/([A-Za-z0-9_-]+)/", url)
+    if match:
+        return f"https://drive.google.com/uc?export=download&id={match.group(1)}"
     return url
 
 
 def _guess_filename(url: str, content_disposition: Optional[str]) -> str:
     if content_disposition:
-        m = re.search(r"filename\\*=UTF-8''([^;]+)", content_disposition)
-        if m:
-            return m.group(1)
-        m = re.search(r'filename="?([^";]+)"?', content_disposition)
-        if m:
-            return m.group(1)
+        encoded = re.search(r"filename\\*=UTF-8''([^;]+)", content_disposition)
+        if encoded:
+            return encoded.group(1)
+        quoted = re.search(r'filename="?([^";]+)"?', content_disposition)
+        if quoted:
+            return quoted.group(1)
     name = url.split("?")[0].rstrip("/").split("/")[-1]
     return name or "file"
 
@@ -53,14 +52,14 @@ def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, categor
 
     _ensure_media_root()
 
-    resp = requests.get(url, stream=True, timeout=30)
-    resp.raise_for_status()
-    ctype = resp.headers.get("Content-Type") or "application/octet-stream"
-    fname = _safe_name(_guess_filename(url, resp.headers.get("Content-Disposition")))
-    if not os.path.splitext(fname)[1]:
-        ext = mimetypes.guess_extension(ctype) or ""
+    response = requests.get(url, stream=True, timeout=30)
+    response.raise_for_status()
+    content_type = response.headers.get("Content-Type") or "application/octet-stream"
+    filename = _safe_name(_guess_filename(url, response.headers.get("Content-Disposition")))
+    if not os.path.splitext(filename)[1]:
+        ext = mimetypes.guess_extension(content_type) or ""
         if ext:
-            fname = fname + ext
+            filename += ext
 
     with conn.cursor() as cur:
         cur.execute(
@@ -69,17 +68,17 @@ def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, categor
             VALUES (%s, %s, 'local', %s, NULL, now())
             RETURNING id
             """,
-            (owner_user_id, "", ctype),
+            (owner_user_id, "", content_type),
         )
         media_id = cur.fetchone()[0]
 
-    key = f"{category}/{media_id}_{fname}"
+    key = f"{category}/{media_id}_{filename}"
     path = _ensure_media_root() / key
     path.parent.mkdir(parents=True, exist_ok=True)
 
     size = 0
     with open(path, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
+        for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 f.write(chunk)
                 size += len(chunk)
@@ -92,3 +91,6 @@ def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, categor
 
     public = f"/media/{media_id}"
     return media_id, public
+
+
+__all__ = ["persist_media_from_url"]
