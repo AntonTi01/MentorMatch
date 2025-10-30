@@ -3,17 +3,11 @@ from typing import Any, Optional
 
 
 def parse_optional_int(value: Optional[Any]) -> Optional[int]:
-    """Convert form/query values to integers while allowing blanks.
-
-    Returns ``None`` when the input is ``None`` or an empty string. Values
-    that are already integers are returned unchanged. Non-convertible inputs
-    also result in ``None`` so callers can decide how to handle validation.
-    """
+    """Преобразует значение в целое число или возвращает ``None``."""
     if value is None:
         return None
     if isinstance(value, int):
         return value
-    # Support floats coming from parsed JSON/form data
     if isinstance(value, float) and value.is_integer():
         return int(value)
     s = str(value).strip()
@@ -26,12 +20,7 @@ def parse_optional_int(value: Optional[Any]) -> Optional[int]:
 
 
 def normalize_optional_str(value: Optional[Any]) -> Optional[str]:
-    """Return a trimmed string or ``None`` when the input is blank.
-
-    ``None`` inputs as well as strings consisting only of whitespace are
-    normalized to ``None`` so callers can safely store NULLs in the database.
-    Non-string values are converted to strings before trimming.
-    """
+    """Очищает строку от пробелов и возвращает ``None`` для пустых значений."""
     if value is None:
         return None
     if isinstance(value, str):
@@ -42,7 +31,7 @@ def normalize_optional_str(value: Optional[Any]) -> Optional[str]:
 
 
 def resolve_service_account_path(path: Optional[str]) -> Optional[str]:
-    """Return an absolute path to the service account JSON if it exists."""
+    """Ищет путь к файлу сервисного аккаунта и возвращает абсолютный путь."""
     if not path:
         return None
     try:

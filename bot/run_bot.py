@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+                      
 """
 Скрипт для запуска MentorMatch Telegram бота
 """
@@ -7,10 +7,10 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Добавляем текущую папку в путь для импорта
+                                            
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Загружаем переменные окружения
+                                
 load_dotenv()
 
 def main():
@@ -18,7 +18,7 @@ def main():
     try:
         from bot import MentorMatchBot
         
-        # Проверяем наличие токена
+                                  
         if not os.getenv('TELEGRAM_BOT_TOKEN'):
             print("❌ Ошибка: TELEGRAM_BOT_TOKEN не найден в переменных окружения")
             print("Добавьте в .env файл:")
@@ -33,7 +33,7 @@ def main():
         print("🔄 Для остановки нажмите Ctrl+C")
         print("-" * 50)
         
-        # Создаем и запускаем бота
+                                  
         bot = MentorMatchBot()
         bot.run()
         

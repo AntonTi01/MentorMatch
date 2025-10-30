@@ -5,6 +5,7 @@ import logging
 from typing import Dict, List, Optional
 
 from telegram import InlineKeyboardButton, Update
+from telegram.error import NetworkError
 from telegram.ext import ContextTypes
 
 from .base import BaseHandlers
@@ -14,9 +15,11 @@ logger = logging.getLogger(__name__)
 
 class MenuHandlers(BaseHandlers):
     async def cmd_start2(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_start2."""
         return await self.cmd_start(update, context)
 
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_start."""
         context.user_data.pop("awaiting", None)
         context.user_data.pop("topic_role", None)
         for key in (
@@ -46,6 +49,9 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
             ]
             text = "Админ‑меню: выберите раздел"
+            stats_line = await self._roles_stats_line()
+            if stats_line:
+                text = f"{text}\n\n{stats_line}"
             if update.message:
                 await update.message.reply_text(
                     self._fix_text(text), reply_markup=self._mk(kb)
@@ -133,6 +139,7 @@ class MenuHandlers(BaseHandlers):
             )
 
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_help."""
         await update.message.reply_text(
             self._fix_text(
                 "Разделы: Студенты, Научные руководители, Темы. В профиле студента — кнопка Подобрать тему. "
@@ -141,11 +148,17 @@ class MenuHandlers(BaseHandlers):
         )
 
     async def _show_role_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию _show_role_menu."""
         raw_role = context.user_data.get("role")
         role = self._normalize_role_value(raw_role) or raw_role
         uid = context.user_data.get("uid")
         context.user_data.pop("student_match_back", None)
         if role == "student":
+            browse_rows = [
+                [InlineKeyboardButton("👨‍🎓 Студенты", callback_data="list_students")],
+                [InlineKeyboardButton("🧑‍🏫 Научные руководители", callback_data="list_supervisors")],
+                [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
+            ]
             kb = [
                 [InlineKeyboardButton("👤 Мой профиль", callback_data="student_me")],
                 [InlineKeyboardButton("📚 Мои темы", callback_data="my_topics")],
@@ -158,8 +171,17 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📥 Входящие заявки", callback_data="messages_inbox")],
                 [InlineKeyboardButton("📤 Мои заявки", callback_data="messages_outbox")],
             ]
+            kb[1:1] = browse_rows
             text = "Студент: выберите действие"
+            stats_line = await self._roles_stats_line()
+            if stats_line:
+                text = f"{text}\n\n{stats_line}"
         else:
+            browse_rows = [
+                [InlineKeyboardButton("👨‍🎓 Студенты", callback_data="list_students")],
+                [InlineKeyboardButton("🧑‍🏫 Научные руководители", callback_data="list_supervisors")],
+                [InlineKeyboardButton("📚 Темы", callback_data="list_topics")],
+            ]
             kb = [
                 [InlineKeyboardButton("👤 Мой профиль", callback_data="supervisor_me")],
                 [InlineKeyboardButton("📚 Мои темы", callback_data="my_topics")],
@@ -172,6 +194,7 @@ class MenuHandlers(BaseHandlers):
                 [InlineKeyboardButton("📥 Входящие заявки", callback_data="messages_inbox")],
                 [InlineKeyboardButton("📤 Мои заявки", callback_data="messages_outbox")],
             ]
+            kb[1:1] = browse_rows
             text = "Научный руководитель: выберите действие"
         if update.callback_query:
             await update.callback_query.edit_message_text(
@@ -182,9 +205,27 @@ class MenuHandlers(BaseHandlers):
                 self._fix_text(text), reply_markup=self._mk(kb)
             )
 
+    async def _roles_stats_line(self) -> Optional[str]:
+        """Выполняет функцию _roles_stats_line."""
+        stats = await self._api_get("/api/roles/stats") or {}
+        if not isinstance(stats, dict):
+            return None
+        try:
+            total = int(stats.get("total", 0))
+            available = int(stats.get("available", 0))
+        except (TypeError, ValueError):
+            return None
+        return f"Осталось свободных ролей {available}/{total}"
+
     async def cb_back(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_back."""
         context.user_data.pop("messages_cache", None)
         await self.cmd_start(update, context)
 
     async def on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        logger.exception("Handler error", exc_info=context.error)
+        """Выполняет функцию on_error."""
+        error = getattr(context, "error", None)
+        if isinstance(error, NetworkError):
+            logger.warning("Telegram network error ignored: %s", error)
+            return
+        logger.exception("Handler error", exc_info=error)

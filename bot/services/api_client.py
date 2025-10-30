@@ -13,9 +13,11 @@ class APIClient:
     """Thin wrapper around aiohttp for MentorMatch REST API calls."""
 
     def __init__(self, base_url: str) -> None:
+        """Выполняет функцию __init__."""
         self.base_url = base_url.rstrip("/")
 
     async def get(self, path: str, *, timeout: int = 20) -> Optional[dict[str, Any]]:
+        """Выполняет функцию get."""
         url = f"{self.base_url}{path}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -34,6 +36,7 @@ class APIClient:
         *,
         timeout: int = 60,
     ) -> Optional[dict[str, Any]]:
+        """Выполняет функцию post."""
         url = f"{self.base_url}{path}"
         try:
             async with aiohttp.ClientSession() as session:

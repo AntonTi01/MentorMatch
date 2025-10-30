@@ -9,6 +9,7 @@ from .base import BaseHandlers
 
 class IdentityHandlers(BaseHandlers):
     async def cb_confirm_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_confirm_me."""
         query = update.callback_query
         await self._answer_callback(query)
         uid = int(query.data.split("_")[2])
@@ -28,6 +29,7 @@ class IdentityHandlers(BaseHandlers):
         await self._show_role_menu(update, context)
 
     async def cb_not_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_not_me."""
         query = update.callback_query
         await self._answer_callback(query)
         kb = [
@@ -43,6 +45,7 @@ class IdentityHandlers(BaseHandlers):
         )
 
     async def cb_register_role(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_register_role."""
         query = update.callback_query
         await self._answer_callback(query)
         role = query.data.split("_")[-1]

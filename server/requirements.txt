@@ -2,11 +2,7 @@ fastapi
 uvicorn[standard]
 psycopg2-binary
 python-dotenv
-gspread
-google-auth
-Jinja2
-openai
+httpx
 python-multipart>=0.0.9
-pypdf>=4.2.0
-python-docx>=0.8.11
+requests
 
