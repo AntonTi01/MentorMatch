@@ -17,6 +17,7 @@ PAGE_LIMIT = 20
 
 
 def _fetch_students(conn, offset: int, limit: int) -> Tuple[List[Dict[str, Any]], bool]:
+    """Получает страницу студентов и признак наличия следующих записей."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -35,6 +36,7 @@ def _fetch_students(conn, offset: int, limit: int) -> Tuple[List[Dict[str, Any]]
 
 
 def _fetch_supervisors(conn, offset: int, limit: int) -> Tuple[List[Dict[str, Any]], bool]:
+    """Возвращает страницу наставников вместе с флагом продолжения."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -53,6 +55,7 @@ def _fetch_supervisors(conn, offset: int, limit: int) -> Tuple[List[Dict[str, An
 
 
 def _fetch_topics(conn, offset: int, limit: int) -> Tuple[List[Dict[str, Any]], bool]:
+    """Загружает темы для панели администрирования с пагинацией."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -70,6 +73,7 @@ def _fetch_topics(conn, offset: int, limit: int) -> Tuple[List[Dict[str, Any]], 
 
 
 def _fetch_role_topics(conn, topic_ids: Optional[Sequence[int]] = None) -> List[Dict[str, Any]]:
+    """Собирает темы и связанные роли для отображения в интерфейсе."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         params: Tuple[Any, ...]
         query = (
@@ -141,12 +145,14 @@ def _fetch_role_topics(conn, topic_ids: Optional[Sequence[int]] = None) -> List[
 
 
 def _fetch_people(conn, role: str) -> List[Dict[str, Any]]:
+    """Возвращает список пользователей определённой роли по алфавиту."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT id, full_name FROM users WHERE role=%s ORDER BY full_name ASC", (role,))
         return [dict(r) for r in cur.fetchall()]
 
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
+    """Регистрирует страницы административной панели мониторинга."""
     templates = ctx.templates
 
     @router.get("/", response_class=HTMLResponse)
@@ -156,6 +162,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         page: int = 0,
         msg: Optional[str] = None,
     ):
+        """Отображает главную страницу админки с выбранной вкладкой."""
         allowed_tabs = {"topics", "students", "supervisors"}
         current_tab = tab if tab in allowed_tabs else "topics"
         current_page = max(page, 0)
@@ -204,6 +211,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.post("/save-approvals")
     async def save_approvals(request: Request):
+        """Обрабатывает форму утверждений студентов и наставников."""
         form = await request.form()
         role_updates: Dict[int, Optional[int]] = {}
         topic_updates: Dict[int, Optional[int]] = {}
@@ -227,6 +235,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.post("/assignments", response_class=JSONResponse)
     async def update_assignment(payload: Dict[str, Any] = Body(...)):
+        """Принимает AJAX-запрос для обновления назначений по ролям и темам."""
         role_updates: Dict[int, Optional[int]] = {}
         topic_updates: Dict[int, Optional[int]] = {}
         if "role_id" in payload:
@@ -242,6 +251,7 @@ def _apply_assignment_updates(
     role_updates: Dict[int, Optional[int]],
     topic_updates: Dict[int, Optional[int]],
 ) -> str:
+    """Сохраняет выбранных студентов и наставников и запускает обновление эмбеддингов."""
     updated_roles = 0
     updated_topics = 0
 

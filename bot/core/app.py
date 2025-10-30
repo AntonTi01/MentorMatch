@@ -26,6 +26,7 @@ class BotCore:
     EDIT_KEEP = "__keep__"
 
     def __init__(self) -> None:
+        """Выполняет функцию __init__."""
         load_dotenv()
 
         logging.basicConfig(
@@ -64,30 +65,36 @@ class BotCore:
 
         dispatcher.setup(self.app, self)
 
-    # --- helper wrappers to keep backwards compatibility ---
+                                                             
     def _parse_positive_float(self, value: Any) -> Optional[float]:
+        """Выполняет функцию _parse_positive_float."""
         return parse_positive_float(value)
 
     def _parse_positive_int(self, value: Any) -> Optional[int]:
+        """Выполняет функцию _parse_positive_int."""
         return parse_positive_int(value)
 
     def _truthy_flag(self, value: Any, *, default: bool = False) -> bool:
+        """Выполняет функцию _truthy_flag."""
         return truthy_flag(value, default=default)
 
-    # Lifecycle -----------------------------------------------------------
+                                                                           
     async def _post_init(self, _: Application) -> None:
+        """Выполняет функцию _post_init."""
         try:
             await self._start_http_server()
         except Exception:
             logger.exception("Не удалось запустить внутренний HTTP-сервер уведомлений")
 
     async def _post_shutdown(self, _: Application) -> None:
+        """Выполняет функцию _post_shutdown."""
         try:
             await self._stop_http_server()
         except Exception:
             logger.exception("Ошибка при остановке внутреннего HTTP-сервера уведомлений")
 
     async def _start_http_server(self) -> None:
+        """Выполняет функцию _start_http_server."""
         if self._http_runner is not None:
             return
         self._http_runner = web.AppRunner(self._http_app)
@@ -99,6 +106,7 @@ class BotCore:
         logger.info("Bot HTTP API listening on %s:%s", self.http_host, self.http_port)
 
     async def _stop_http_server(self) -> None:
+        """Выполняет функцию _stop_http_server."""
         if self._http_site is not None:
             await self._http_site.stop()
             self._http_site = None
@@ -108,9 +116,11 @@ class BotCore:
             logger.info("Bot HTTP API stopped")
 
     async def _handle_healthcheck(self, _: web.Request) -> web.Response:
+        """Выполняет функцию _handle_healthcheck."""
         return web.json_response({"status": "ok"})
 
     async def _handle_notify(self, request: web.Request) -> web.Response:
+        """Выполняет функцию _handle_notify."""
         payload: dict[str, Any] = {}
         if request.can_read_body:
             try:
@@ -161,25 +171,30 @@ class BotCore:
         return web.json_response({"status": "ok"})
 
     def run(self) -> None:
+        """Выполняет функцию run."""
         self.app.run_polling()
 
-    # API wrappers -------------------------------------------------------
+                                                                          
     async def _api_get(self, path: str) -> Optional[dict[str, Any]]:
+        """Выполняет функцию _api_get."""
         return await self.api.get(path)
 
     async def _api_post(
         self, path: str, data: dict[str, Any], timeout: int = 60
     ) -> Optional[dict[str, Any]]:
+        """Выполняет функцию _api_post."""
         return await self.api.post(path, data, timeout=timeout)
 
-    # Placeholders for mixins -------------------------------------------
-    def _build_reply_markup(self, payload: dict[str, Any]):  # pragma: no cover - overridden
+                                                                         
+    def _build_reply_markup(self, payload: dict[str, Any]):                                 
+        """Выполняет функцию _build_reply_markup."""
         handler = getattr(super(), "_build_reply_markup", None)
         if handler is None:
             return None
         return handler(payload)
 
-    def _fix_text(self, s: Any):  # pragma: no cover - overridden
+    def _fix_text(self, s: Any):                                 
+        """Выполняет функцию _fix_text."""
         handler = getattr(super(), "_fix_text", None)
         if handler is None:
             return s

@@ -22,13 +22,15 @@ class ImportSupervisorsPayload(BaseModel):
     service_account_file: Optional[str] = None
 
 
-# Создает и настраивает роутер для импорта данных наставников
+                                                             
 def create_supervisors_import_router(get_conn: Callable[[], connection]) -> APIRouter:
+    """Создаёт роутер FastAPI для импорта наставников."""
     router = APIRouter()
 
-    # Обрабатывает запрос на импорт наставников из Google Sheets
+                                                                
     @router.post("/api/import/supervisors", response_class=JSONResponse)
     def import_supervisors_endpoint(payload: ImportSupervisorsPayload):
+        """Загружает лист наставников и передаёт данные в workflow импорта."""
         try:
             service_account_file = ensure_service_account_file(
                 payload.service_account_file or os.getenv("SERVICE_ACCOUNT_FILE", "service-account.json")

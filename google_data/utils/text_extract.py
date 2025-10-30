@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 
-# Функция _read_text_file обрабатывает данные файлов
+                                                    
 def _read_text_file(p: Path) -> str:
+    """Читает текстовый файл, подбирая подходящую кодировку."""
     try:
         return p.read_text(encoding="utf-8", errors="ignore")
     except Exception:
@@ -15,8 +16,9 @@ def _read_text_file(p: Path) -> str:
             return ""
 
 
-# Функция _read_pdf обрабатывает данные файлов
+                                              
 def _read_pdf(p: Path) -> str:
+    """Извлекает текст из PDF-документа, объединяя содержимое страниц."""
     try:
         from pypdf import PdfReader
 
@@ -32,8 +34,9 @@ def _read_pdf(p: Path) -> str:
         return ""
 
 
-# Функция _read_docx обрабатывает данные файлов
+                                               
 def _read_docx(p: Path) -> str:
+    """Получает текст из документа DOCX построчно."""
     try:
         import docx
 
@@ -46,8 +49,9 @@ def _read_docx(p: Path) -> str:
         return ""
 
 
-# Функция extract_text_from_file обрабатывает данные файлов
+                                                           
 def extract_text_from_file(path: Path, mime_type: Optional[str] = None) -> str:
+    """Определяет тип файла и извлекает из него текстовое содержимое."""
     if not path or not Path(path).exists():
         return ""
     file_path = Path(path)

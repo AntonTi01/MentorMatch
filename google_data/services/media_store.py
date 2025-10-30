@@ -11,14 +11,16 @@ import requests
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media")).resolve()
 
 
-# Гарантирует, что директория для хранения медиа существует
+                                                           
 def _ensure_media_root() -> Path:
+    """Создаёт директорию хранения медиафайлов при первом обращении."""
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
     return MEDIA_ROOT
 
 
-# Приводит ссылки Google Drive к прямому адресу скачивания
+                                                          
 def _normalize_drive_url(url: str) -> str:
+    """Преобразует ссылку Google Drive в прямой URL для скачивания."""
     match = re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
     if match:
         return f"https://drive.google.com/uc?export=download&id={match.group(1)}"
@@ -28,8 +30,9 @@ def _normalize_drive_url(url: str) -> str:
     return url
 
 
-# Определяет имя файла на основе заголовков или адреса ссылки
+                                                             
 def _guess_filename(url: str, content_disposition: Optional[str]) -> str:
+    """Определяет имя скачиваемого файла по заголовку ответа или адресу."""
     if content_disposition:
         encoded = re.search(r"filename\\*=UTF-8''([^;]+)", content_disposition)
         if encoded:
@@ -41,14 +44,16 @@ def _guess_filename(url: str, content_disposition: Optional[str]) -> str:
     return name or "file"
 
 
-# Очищает имя файла от недопустимых символов
+                                            
 def _safe_name(name: str) -> str:
+    """Очищает имя файла от лишних символов и ограничивает длину."""
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
     return safe[:200]
 
 
-# Скачивает медиафайл по ссылке и сохраняет запись в базе
+                                                         
 def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, category: str = "cv") -> Tuple[int, str]:
+    """Скачивает файл, сохраняет его локально и регистрирует запись в базе."""
     if not url or not url.strip():
         raise ValueError("empty url")
     url = url.strip()

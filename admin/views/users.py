@@ -14,10 +14,12 @@ from ..utils_common import parse_optional_int
 
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
+    """Подключает административные представления для управления пользователями."""
     templates = ctx.templates
 
     @router.get('/add-student', response_class=HTMLResponse)
     def new_student(request: Request, msg: Optional[str] = None):
+        """Показывает форму создания новой учётной записи студента."""
         return templates.TemplateResponse(
             'admin/student_form.html',
             {
@@ -40,6 +42,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         interests: Optional[str] = Form(None),
         cv: Optional[str] = Form(None),
     ):
+        """Создаёт студента и его профиль на основе данных формы."""
         full_name = (full_name or '').strip()
         if not full_name:
             notice = urllib.parse.quote('Укажите имя студента')
@@ -74,6 +77,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/add-supervisor', response_class=HTMLResponse)
     def new_supervisor(request: Request, msg: Optional[str] = None):
+        """Отображает форму добавления нового наставника."""
         return templates.TemplateResponse(
             'admin/supervisor_form.html',
             {
@@ -97,6 +101,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         requirements: Optional[str] = Form(None),
         interests: Optional[str] = Form(None),
     ):
+        """Сохраняет данные наставника, обновляя профиль и пользователя."""
         full_name = (full_name or '').strip()
         if not full_name:
             notice = urllib.parse.quote('Укажите имя руководителя')
@@ -151,6 +156,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/user/{user_id}', response_class=HTMLResponse)
     def view_user(request: Request, user_id: int, msg: Optional[str] = None):
+        """Показывает карточку пользователя с рекомендациями по подбору."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute('SELECT * FROM users WHERE id=%s', (user_id,))
             user = cur.fetchone()
@@ -228,6 +234,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/supervisor/{user_id}', response_class=HTMLResponse)
     def view_supervisor(request: Request, user_id: int, msg: Optional[str] = None):
+        """Отображает страницу наставника с рекомендованными темами."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -276,6 +283,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/edit-user/{user_id}', response_class=HTMLResponse)
     def edit_user(request: Request, user_id: int, msg: Optional[str] = None):
+        """Открывает форму редактирования базовых данных пользователя."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 'SELECT id, full_name, email, username, role, consent_personal, consent_private FROM users WHERE id=%s',
@@ -305,6 +313,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         consent_personal: Optional[str] = Form(None),
         consent_private: Optional[str] = Form(None),
     ):
+        """Обновляет пользователя и запускает перерасчёт эмбеддингов при необходимости."""
         cp = str(consent_personal or '').lower() in ('1', 'true', 'on', 'yes', 'y')
         cpr = str(consent_private or '').lower() in ('1', 'true', 'on', 'yes', 'y')
         username_normalized = normalize_telegram_link(username)
@@ -329,6 +338,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/edit-supervisor/{user_id}', response_class=HTMLResponse)
     def edit_supervisor(request: Request, user_id: int, msg: Optional[str] = None):
+        """Предоставляет форму редактирования профиля наставника."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -366,6 +376,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         interests: Optional[str] = Form(None),
         requirements: Optional[str] = Form(None),
     ):
+        """Сохраняет изменения наставника и инициирует обновление эмбеддинга."""
         username_normalized = normalize_telegram_link(username)
         with ctx.get_conn() as conn, conn.cursor() as cur:
             capacity_val = parse_optional_int(capacity)

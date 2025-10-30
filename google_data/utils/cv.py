@@ -9,8 +9,9 @@ from ..services.media_store import MEDIA_ROOT
 from .text_extract import extract_text_from_file
 
 
-# Возвращает текстовое представление резюме по сохраненному значению
+                                                                    
 def resolve_cv_text(conn: connection, cv_value: Optional[str]) -> Optional[str]:
+    """Возвращает текстовое содержимое резюме по ссылке из базы."""
     value = (cv_value or "").strip()
     if not value:
         return None

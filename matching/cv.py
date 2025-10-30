@@ -16,6 +16,7 @@ MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def resolve_cv_text(conn: connection, cv_value: Optional[str]) -> Optional[str]:
+    """Выполняет функцию resolve_cv_text."""
     value = (cv_value or "").strip()
     if not value:
         return None

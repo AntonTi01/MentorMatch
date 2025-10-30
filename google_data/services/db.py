@@ -6,8 +6,9 @@ import psycopg2
 from psycopg2.extensions import connection
 
 
-# Формирует строку подключения к базе данных на основе переменных окружения
+                                                                           
 def build_db_dsn() -> str:
+    """Собирает DSN подключения к базе Google Data из окружения."""
     dsn = os.getenv("DATABASE_URL")
     if dsn:
         return dsn
@@ -19,8 +20,9 @@ def build_db_dsn() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 
-# Открывает новое соединение с базой данных PostgreSQL
+                                                      
 def get_conn() -> connection:
+    """Создаёт соединение с базой данных Google Data."""
     return psycopg2.connect(build_db_dsn())
 
 

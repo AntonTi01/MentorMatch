@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+                      
 """
 Тест для проверки работы MentorMatch Bot
 """
@@ -7,7 +7,7 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Добавляем текущую папку в путь для импорта
+                                            
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def test_bot_import():

@@ -22,13 +22,15 @@ class ImportSheetPayload(BaseModel):
     service_account_file: Optional[str] = None
 
 
-# Создает и настраивает роутер для импорта данных студентов
+                                                           
 def create_students_import_router(get_conn: Callable[[], connection]) -> APIRouter:
+    """Создаёт роутер для импорта студентов из Google Sheets."""
     router = APIRouter()
 
-    # Обрабатывает запрос на импорт студентов из Google Sheets
+                                                              
     @router.post("/api/import/students", response_class=JSONResponse)
     def import_sheet(payload: ImportSheetPayload):
+        """Загружает данные студентов из таблицы и сохраняет их в базе."""
         try:
             service_account_file = ensure_service_account_file(
                 payload.service_account_file or os.getenv("SERVICE_ACCOUNT_FILE", "service-account.json")

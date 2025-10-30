@@ -10,16 +10,18 @@ from google.oauth2.service_account import Credentials
 
 
 
-# Функция _simplify нормализует строку для сравнения
+                                                    
 def _simplify(s: str) -> str:
+    """Приводит строку к нижнему регистру и удаляет посторонние символы."""
     s = (s or '').strip().lower()
     s = re.sub(r"[^0-9a-z\u0430-\u044f\u0451]+", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"\s+", " ", s)
     return s.strip()
 
 
-# Функция _split_list разбивает строку на список значений
+                                                         
 def _split_list(s: str) -> Optional[List[str]]:
+    """Разбивает строку по разделителям на список значений."""
     if not s or not s.strip():
         return None
     parts = re.split(r"[;,/|]\s*|\s{2,}", s.strip())
@@ -27,8 +29,9 @@ def _split_list(s: str) -> Optional[List[str]]:
     return parts or None
 
 
-# Функция _to_bool_ru приводит ответ к булевому значению
+                                                        
 def _to_bool_ru(s: str) -> Optional[bool]:
+    """Интерпретирует русские ответы «да/нет» как булевы значения."""
     v = (s or '').strip().lower()
     if not v:
         return None
@@ -41,8 +44,9 @@ def _to_bool_ru(s: str) -> Optional[bool]:
     return None
 
 
-# Функция _to_level_0_5 приводит значение к диапазону 0-5
+                                                         
 def _to_level_0_5(s: str) -> Optional[int]:
+    """Извлекает оценку от 0 до 5 из строкового ответа."""
     v = (s or '').strip()
     if not v:
         return None
@@ -62,8 +66,9 @@ def _to_level_0_5(s: str) -> Optional[int]:
     return None
 
 
-# Функция _parse_timestamp нормализует метку времени
+                                                    
 def _parse_timestamp(ts: str) -> Optional[str]:
+    """Преобразует отметку времени из формы в формат ISO."""
     if not ts:
         return None
     for fmt in ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
@@ -74,16 +79,18 @@ def _parse_timestamp(ts: str) -> Optional[str]:
     return ts
 
 
-# Функция _extract_first_url ищет первую ссылку в тексте
+                                                        
 def _extract_first_url(s: str) -> Optional[str]:
+    """Находит первую URL-ссылку в произвольной строке."""
     if not s:
         return None
     m = re.search(r"(https?://\S+)", s)
     return m.group(1) if m else None
 
 
-# Функция _extract_telegram_username достаёт логин Telegram
+                                                           
 def _extract_telegram_username(s: str) -> Optional[str]:
+    """Извлекает username Telegram из текста или ссылки."""
     if not s:
         return None
     s = s.strip()
@@ -95,7 +102,7 @@ def _extract_telegram_username(s: str) -> Optional[str]:
     return re.sub(r"[^A-Za-z0-9_]", "", s) or None
 
 
-# Функция _format_telegram_link формирует ссылку на Telegram
+                                                            
 def _format_telegram_link(raw: Optional[str]) -> Optional[str]:
     """Вернуть ссылку вида https://t.me/<username> с учётом @ и неполных ссылок."""
     if not raw:
@@ -145,8 +152,9 @@ HEADER_ALIASES: Dict[str, List[str]] = {
 }
 
 
-# Функция _build_col_index строит индекс колонок
+                                                
 def _build_col_index(headers: List[str]) -> Dict[str, int]:
+    """Сопоставляет заголовки таблицы с ожидаемыми ключами анкеты студентов."""
     idx_map: Dict[str, int] = {}
     sim = [_simplify(h) for h in headers]
     for key, aliases in HEADER_ALIASES.items():
@@ -163,15 +171,17 @@ def _build_col_index(headers: List[str]) -> Dict[str, int]:
     return idx_map
 
 
-# Функция _cell безопасно выбирает значение ячейки
+                                                  
 def _cell(row: List[str], j: Optional[int]) -> str:
+    """Возвращает значение ячейки, аккуратно обрабатывая отсутствующие индексы."""
     if j is None or j < 0:
         return ''
     return (row[j] or '').strip()
 
 
-# Функция _normalize_row нормализует запись студента
+                                                    
 def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
+    """Преобразует строку формы студента в словарь с нормализованными полями."""
     hard_have = _cell(row, cols.get('hard_skills_have'))
     hard_want = _cell(row, cols.get('hard_skills_want'))
     interests = _cell(row, cols.get('interests'))
@@ -250,11 +260,13 @@ def _normalize_row(row: List[str], cols: Dict[str, int]) -> Dict[str, Any]:
 
 
 
-# Функция _select_worksheet выбирает нужный лист
+                                                
 def _select_worksheet(sh, sheet_name: Optional[str]):
+    """Выбирает лист Google Sheets по имени или возвращает основной."""
     titles = [ws.title for ws in sh.worksheets()]
-    # Функция norm нормализует значение
+                                       
     def norm(s: Optional[str]) -> str:
+        """Нормализует название листа для нечувствительного сравнения."""
         return (s or '').strip().lower()
 
     if not sheet_name or norm(sheet_name) in ('none', 'null', ''):
@@ -273,12 +285,13 @@ def _select_worksheet(sh, sheet_name: Optional[str]):
     return sh.worksheets()[0]
 
 
-# Функция fetch_normalized_rows загружает строки студентов из Google Sheets
+                                                                           
 def fetch_normalized_rows(
     spreadsheet_id: str,
     sheet_name: Optional[str],
     service_account_file: Union[str, Path] = 'service-account.json'
 ) -> List[Dict[str, Any]]:
+    """Загружает и нормализует ответы студентов из Google Forms."""
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     creds = Credentials.from_service_account_file(str(service_account_file), scopes=scopes)
     gc = gspread.authorize(creds)
@@ -310,8 +323,9 @@ SUP_HEADER_ALIASES: Dict[str, List[str]] = {
 }
 
 
-# Функция _build_col_index_sup строит индекс колонок для наставников
+                                                                    
 def _build_col_index_sup(headers: List[str]) -> Dict[str, int]:
+    """Определяет индексы колонок в анкете наставников по известным заголовкам."""
     idx_map: Dict[str, Any] = {}
     sim = [_simplify(h) for h in headers]
     for key, aliases in SUP_HEADER_ALIASES.items():
@@ -342,8 +356,9 @@ def _build_col_index_sup(headers: List[str]) -> Dict[str, int]:
     return idx_map
 
 
-# Функция _normalize_supervisor_row нормализует запись наставника
+                                                                 
 def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str, Any]:
+    """Преобразует строку наставника в структурированный словарь."""
     telegram_link = _format_telegram_link(_cell(row, cols.get('telegram')))
     area = _cell(row, cols.get('area')) or None
 
@@ -381,8 +396,9 @@ def _normalize_supervisor_row(row: List[str], cols: Dict[str, Any]) -> Dict[str,
     }
 
 
-# Функция _select_worksheet_second выбирает запасной лист
+                                                         
 def _select_worksheet_second(sh) -> Any:
+    """Возвращает второй лист таблицы, используя первый как запасной вариант."""
     try:
         wss = sh.worksheets()
         if len(wss) >= 2:
@@ -392,12 +408,13 @@ def _select_worksheet_second(sh) -> Any:
         return sh.sheet1
 
 
-# Функция fetch_supervisor_rows загружает строки наставников из Google Sheets
+                                                                             
 def fetch_supervisor_rows(
     spreadsheet_id: str,
     sheet_name: Optional[str] = None,
     service_account_file: Union[str, Path] = 'service-account.json'
 ) -> List[Dict[str, Any]]:
+    """Загружает и нормализует ответы наставников из Google Forms."""
     scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
     creds = Credentials.from_service_account_file(str(service_account_file), scopes=scopes)
     gc = gspread.authorize(creds)

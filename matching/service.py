@@ -30,15 +30,18 @@ logger = logging.getLogger(__name__)
 
 
 def _pick_llm(llm: Optional[MatchingLLMClient]) -> Optional[MatchingLLMClient]:
+    """Выполняет функцию _pick_llm."""
     return llm or create_matching_llm_client()
 
 
 def _enrich_cv(conn: connection, candidates: List[Dict[str, Any]]) -> None:
+    """Выполняет функцию _enrich_cv."""
     for candidate in candidates:
         candidate["cv"] = resolve_cv_text(conn, candidate.get("cv"))
 
 
 def _fallback_top5(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Выполняет функцию _fallback_top5."""
     return [
         {
             "user_id": candidate.get("user_id"),
@@ -50,6 +53,7 @@ def _fallback_top5(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _fallback_top5_topics(topics: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Выполняет функцию _fallback_top5_topics."""
     return [
         {
             "topic_id": topic.get("id"),
@@ -61,6 +65,7 @@ def _fallback_top5_topics(topics: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _fallback_top5_roles(roles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Выполняет функцию _fallback_top5_roles."""
     return [
         {
             "role_id": role.get("id"),
@@ -78,6 +83,7 @@ def handle_match(
     target_role: Optional[str] = None,
     llm_client: Optional[MatchingLLMClient] = None,
 ) -> Dict[str, Any]:
+    """Выполняет функцию handle_match."""
     topic = fetch_topic(conn, topic_id)
     if not topic:
         return {"status": "error", "message": f"Topic #{topic_id} not found"}
@@ -138,7 +144,7 @@ def handle_match(
                         ),
                     )
             conn.commit()
-        except Exception as exc:  # pragma: no cover - database failure is logged
+        except Exception as exc:                                                 
             logger.warning("Failed to persist supervisor candidates: %s", exc)
 
     return {
@@ -156,6 +162,7 @@ def handle_match_role(
     *,
     llm_client: Optional[MatchingLLMClient] = None,
 ) -> Dict[str, Any]:
+    """Выполняет функцию handle_match_role."""
     role_row = fetch_role(conn, role_id)
     if not role_row:
         return {"status": "error", "message": f"Role #{role_id} not found"}
@@ -233,7 +240,7 @@ def handle_match_role(
                         ),
                     )
             conn.commit()
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:                    
             logger.warning("Failed to persist role candidates: %s", exc)
 
     return {"status": "ok", "role_id": role_id, "items": items}
@@ -245,6 +252,7 @@ def handle_match_student(
     *,
     llm_client: Optional[MatchingLLMClient] = None,
 ) -> Dict[str, Any]:
+    """Выполняет функцию handle_match_student."""
     student = fetch_student(conn, student_user_id)
     if not student:
         return {"status": "error", "message": f"Student #{student_user_id} not found"}
@@ -303,7 +311,7 @@ def handle_match_student(
                         ),
                     )
             conn.commit()
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:                    
             logger.warning("Failed to persist roles for student %s: %s", student_user_id, exc)
 
     return {"status": "ok", "student_user_id": student_user_id, "items": items}
@@ -315,6 +323,7 @@ def handle_match_supervisor_user(
     *,
     llm_client: Optional[MatchingLLMClient] = None,
 ) -> Dict[str, Any]:
+    """Выполняет функцию handle_match_supervisor_user."""
     supervisor = fetch_supervisor(conn, supervisor_user_id)
     if not supervisor:
         return {"status": "error", "message": f"Supervisor #{supervisor_user_id} not found"}
@@ -370,7 +379,7 @@ def handle_match_supervisor_user(
                         ),
                     )
             conn.commit()
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:                    
             logger.warning(
                 "Failed to persist topics for supervisor %s: %s", supervisor_user_id, exc
             )

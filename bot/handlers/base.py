@@ -16,6 +16,7 @@ class BaseHandlers:
     """Utility mixin with helper methods reused across handlers."""
 
     def _fix_text(self, s: Optional[str]) -> Optional[str]:
+        """Выполняет функцию _fix_text."""
         if not isinstance(s, str):
             return s
         if not any(ch in s for ch in ("Ð", "Ñ", "Ã", "Â", "â", "ð")):
@@ -28,6 +29,7 @@ class BaseHandlers:
         return s
 
     def _mk(self, kb: List[List[InlineKeyboardButton]]) -> InlineKeyboardMarkup:
+        """Выполняет функцию _mk."""
         for row in kb:
             for btn in row:
                 try:
@@ -37,6 +39,7 @@ class BaseHandlers:
         return InlineKeyboardMarkup(kb)
 
     def _build_reply_markup(self, payload: Dict[str, Any]) -> Optional[InlineKeyboardMarkup]:
+        """Выполняет функцию _build_reply_markup."""
         keyboard: List[List[InlineKeyboardButton]] = []
         markup_payload = payload.get("reply_markup")
         if isinstance(markup_payload, str):
@@ -94,6 +97,7 @@ class BaseHandlers:
         return None
 
     async def _answer_callback(self, q, **kwargs) -> None:
+        """Выполняет функцию _answer_callback."""
         if not q:
             return
         try:
@@ -110,6 +114,7 @@ class BaseHandlers:
             )
 
     def _ids_equal(self, left: Any, right: Any) -> bool:
+        """Выполняет функцию _ids_equal."""
         if left is None or right is None:
             return False
         left_int = self._parse_positive_int(left)
@@ -122,6 +127,7 @@ class BaseHandlers:
             return False
 
     def _should_skip_optional(self, text: Optional[str]) -> bool:
+        """Выполняет функцию _should_skip_optional."""
         if text is None:
             return True
         stripped = text.strip()
@@ -131,6 +137,7 @@ class BaseHandlers:
         return lowered in {"-", "пропустить", "skip", "нет"}
 
     def _normalize_edit_input(self, text: Optional[str]) -> Optional[str]:
+        """Выполняет функцию _normalize_edit_input."""
         if text is None:
             return self.EDIT_KEEP
         stripped = text.strip()
@@ -144,6 +151,7 @@ class BaseHandlers:
         return text
 
     def _normalize_role_value(self, text: Optional[str]) -> Optional[str]:
+        """Выполняет функцию _normalize_role_value."""
         if text is None:
             return None
         mapping = {
@@ -157,6 +165,7 @@ class BaseHandlers:
         return mapping.get(text.strip().lower())
 
     def _is_admin(self, update: Update) -> bool:
+        """Выполняет функцию _is_admin."""
         user = update.effective_user
         if not user:
             return False
@@ -175,6 +184,7 @@ class BaseHandlers:
         source: str,
         list_callback: str,
     ) -> None:
+        """Выполняет функцию _store_messages_cache."""
         context.user_data["messages_cache"] = {
             "messages": messages,
             "source": source,
@@ -188,6 +198,7 @@ class BaseHandlers:
         include_receiver: bool = False,
         include_sender: bool = False,
     ) -> str:
+        """Выполняет функцию _build_message_view."""
         lines = []
         sender = message.get("sender") or {}
         receiver = message.get("receiver") or {}

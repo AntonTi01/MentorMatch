@@ -6,12 +6,14 @@ from typing import Any, Dict, Iterable, List, Mapping
 
 
 def _trimmed(text: Any, *, limit: int = 20000) -> str | None:
+    """Выполняет функцию _trimmed."""
     if text in (None, ""):
         return None
     return str(text)[:limit]
 
 
 def student_profile(raw: Mapping[str, Any]) -> Dict[str, Any]:
+    """Выполняет функцию student_profile."""
     return {
         "program": raw.get("program"),
         "skills": raw.get("skills"),
@@ -28,6 +30,7 @@ def student_profile(raw: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def supervisor_profile(raw: Mapping[str, Any]) -> Dict[str, Any]:
+    """Выполняет функцию supervisor_profile."""
     return {
         "position": raw.get("position"),
         "degree": raw.get("degree"),
@@ -38,6 +41,7 @@ def supervisor_profile(raw: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def _compact_topic(raw: Mapping[str, Any]) -> Dict[str, Any]:
+    """Выполняет функцию _compact_topic."""
     return {
         "id": raw.get("id"),
         "title": raw.get("title"),
@@ -54,6 +58,7 @@ def _compact_topic(raw: Mapping[str, Any]) -> Dict[str, Any]:
 def build_candidates_payload(
     topic: Mapping[str, Any], candidates: Iterable[Mapping[str, Any]], role: str
 ) -> Dict[str, Any]:
+    """Выполняет функцию build_candidates_payload."""
     comp: List[Dict[str, Any]] = []
     normalized_role = "student" if role not in ("student", "supervisor") else role
     for idx, candidate in enumerate(candidates, start=1):
@@ -89,6 +94,7 @@ def build_role_candidates_payload(
     role_row: Mapping[str, Any],
     candidates: Iterable[Mapping[str, Any]],
 ) -> Dict[str, Any]:
+    """Выполняет функцию build_role_candidates_payload."""
     comp = []
     for idx, candidate in enumerate(candidates, start=1):
         comp.append(
@@ -136,6 +142,7 @@ def build_role_candidates_payload(
 def build_topics_for_student_payload(
     student: Mapping[str, Any], topics: Iterable[Mapping[str, Any]]
 ) -> Dict[str, Any]:
+    """Выполняет функцию build_topics_for_student_payload."""
     comp = []
     for idx, topic in enumerate(topics, start=1):
         comp.append(
@@ -169,6 +176,7 @@ def build_topics_for_student_payload(
 def build_roles_for_student_payload(
     student: Mapping[str, Any], roles: Iterable[Mapping[str, Any]]
 ) -> Dict[str, Any]:
+    """Выполняет функцию build_roles_for_student_payload."""
     comp = []
     for idx, role in enumerate(roles, start=1):
         comp.append(
@@ -203,6 +211,7 @@ def build_roles_for_student_payload(
 def build_topics_for_supervisor_payload(
     supervisor: Mapping[str, Any], topics: Iterable[Mapping[str, Any]]
 ) -> Dict[str, Any]:
+    """Выполняет функцию build_topics_for_supervisor_payload."""
     comp = []
     for idx, topic in enumerate(topics, start=1):
         comp.append(
@@ -234,6 +243,7 @@ def build_topics_for_supervisor_payload(
 
 
 def dumps(payload: Dict[str, Any]) -> str:
+    """Выполняет функцию dumps."""
     return json.dumps(payload, ensure_ascii=False)
 
 

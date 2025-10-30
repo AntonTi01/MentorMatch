@@ -19,6 +19,7 @@ class MatchingLLMClient:
     """Thin wrapper above OpenAI Chat Completions with shared configuration."""
 
     def __init__(self, client: OpenAI, model: str) -> None:
+        """Выполняет функцию __init__."""
         self._client = client
         self._model = model
 
@@ -32,6 +33,7 @@ class MatchingLLMClient:
         schema: Dict[str, Any],
         parser: ItemParser,
     ) -> Optional[List[ParsedItem]]:
+        """Выполняет функцию _call_rank."""
         functions = [
             {
                 "name": function_name,
@@ -51,7 +53,7 @@ class MatchingLLMClient:
                 function_call={"name": function_name},
                 temperature=LLM_TEMPERATURE,
             )
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:                                        
             logger.warning("LLM request failed: %s", exc)
             return None
 
@@ -83,6 +85,7 @@ class MatchingLLMClient:
         return items if len(items) == 5 else None
 
     def rank_candidates(self, payload_json: str) -> Optional[List[ParsedItem]]:
+        """Выполняет функцию rank_candidates."""
         schema = {
             "type": "object",
             "properties": {
@@ -105,6 +108,7 @@ class MatchingLLMClient:
         }
 
         def _parse(raw: Dict[str, Any]) -> Optional[ParsedItem]:
+            """Выполняет функцию _parse."""
             try:
                 return {
                     "user_id": int(raw.get("user_id")),
@@ -131,6 +135,7 @@ class MatchingLLMClient:
         )
 
     def rank_topics(self, payload_json: str) -> Optional[List[ParsedItem]]:
+        """Выполняет функцию rank_topics."""
         schema = {
             "type": "object",
             "properties": {
@@ -153,6 +158,7 @@ class MatchingLLMClient:
         }
 
         def _parse(raw: Dict[str, Any]) -> Optional[ParsedItem]:
+            """Выполняет функцию _parse."""
             try:
                 return {
                     "topic_id": int(raw.get("topic_id")),
@@ -179,6 +185,7 @@ class MatchingLLMClient:
         )
 
     def rank_roles(self, payload_json: str) -> Optional[List[ParsedItem]]:
+        """Выполняет функцию rank_roles."""
         schema = {
             "type": "object",
             "properties": {
@@ -201,6 +208,7 @@ class MatchingLLMClient:
         }
 
         def _parse(raw: Dict[str, Any]) -> Optional[ParsedItem]:
+            """Выполняет функцию _parse."""
             try:
                 return {
                     "role_id": int(raw.get("role_id")),
@@ -228,6 +236,7 @@ class MatchingLLMClient:
 
 
 def create_matching_llm_client() -> Optional[MatchingLLMClient]:
+    """Выполняет функцию create_matching_llm_client."""
     if not (PROXY_API_KEY and PROXY_BASE_URL):
         return None
     client = OpenAI(api_key=PROXY_API_KEY, base_url=PROXY_BASE_URL)

@@ -26,6 +26,7 @@ from .llm import MatchingLLMClient, create_matching_llm_client
 
 
 def _configure_logging() -> logging.Logger:
+    """Выполняет функцию _configure_logging."""
     level_name = (os.getenv("LOG_LEVEL") or "INFO").upper()
     logging.basicConfig(
         level=getattr(logging, level_name, logging.INFO),
@@ -74,24 +75,28 @@ class UserMatchPayload(BaseModel):
 
 
 def _model_args(model_repo_id: Optional[str]) -> dict[str, object]:
+    """Выполняет функцию _model_args."""
     return {"model_repo_id": model_repo_id} if model_repo_id else {}
 
 
 def _llm_client() -> MatchingLLMClient | None:
+    """Выполняет функцию _llm_client."""
     try:
         return create_matching_llm_client()
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except Exception as exc:                                        
         logger.warning("Failed to create LLM client: %s", exc)
         return None
 
 
 @app.get("/health", response_class=JSONResponse)
 def health_check() -> dict[str, str]:
+    """Выполняет функцию health_check."""
     return {"status": "ok"}
 
 
 @app.post("/api/embeddings/student/refresh", response_class=JSONResponse)
 def refresh_student(payload: StudentEmbeddingPayload) -> JSONResponse:
+    """Выполняет функцию refresh_student."""
     with get_conn() as conn:
         refresh_student_embedding(
             conn,
@@ -104,6 +109,7 @@ def refresh_student(payload: StudentEmbeddingPayload) -> JSONResponse:
 
 @app.post("/api/embeddings/supervisor/refresh", response_class=JSONResponse)
 def refresh_supervisor(payload: SupervisorEmbeddingPayload) -> JSONResponse:
+    """Выполняет функцию refresh_supervisor."""
     with get_conn() as conn:
         refresh_supervisor_embedding(
             conn,
@@ -116,6 +122,7 @@ def refresh_supervisor(payload: SupervisorEmbeddingPayload) -> JSONResponse:
 
 @app.post("/api/embeddings/topic/refresh", response_class=JSONResponse)
 def refresh_topic(payload: TopicEmbeddingPayload) -> JSONResponse:
+    """Выполняет функцию refresh_topic."""
     with get_conn() as conn:
         refresh_topic_embedding(
             conn,
@@ -128,6 +135,7 @@ def refresh_topic(payload: TopicEmbeddingPayload) -> JSONResponse:
 
 @app.post("/api/embeddings/role/refresh", response_class=JSONResponse)
 def refresh_role(payload: RoleEmbeddingPayload) -> JSONResponse:
+    """Выполняет функцию refresh_role."""
     with get_conn() as conn:
         refresh_role_embedding(
             conn,
@@ -140,6 +148,7 @@ def refresh_role(payload: RoleEmbeddingPayload) -> JSONResponse:
 
 @app.post("/api/match/topic", response_class=JSONResponse)
 def match_topic(payload: TopicMatchPayload) -> JSONResponse:
+    """Выполняет функцию match_topic."""
     llm = _llm_client()
     with get_conn() as conn:
         result = handle_match(
@@ -155,6 +164,7 @@ def match_topic(payload: TopicMatchPayload) -> JSONResponse:
 
 @app.post("/api/match/role", response_class=JSONResponse)
 def match_role(payload: RoleMatchPayload) -> JSONResponse:
+    """Выполняет функцию match_role."""
     llm = _llm_client()
     with get_conn() as conn:
         result = handle_match_role(conn, role_id=payload.role_id, llm_client=llm)
@@ -165,6 +175,7 @@ def match_role(payload: RoleMatchPayload) -> JSONResponse:
 
 @app.post("/api/match/student", response_class=JSONResponse)
 def match_student(payload: UserMatchPayload) -> JSONResponse:
+    """Выполняет функцию match_student."""
     llm = _llm_client()
     with get_conn() as conn:
         result = handle_match_student(conn, student_user_id=payload.user_id, llm_client=llm)
@@ -175,6 +186,7 @@ def match_student(payload: UserMatchPayload) -> JSONResponse:
 
 @app.post("/api/match/supervisor", response_class=JSONResponse)
 def match_supervisor(payload: UserMatchPayload) -> JSONResponse:
+    """Выполняет функцию match_supervisor."""
     llm = _llm_client()
     with get_conn() as conn:
         result = handle_match_supervisor_user(conn, supervisor_user_id=payload.user_id, llm_client=llm)

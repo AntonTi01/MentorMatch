@@ -61,6 +61,7 @@ def parse_positive_int(value: Any) -> Optional[int]:
 
 
 def truthy_flag(value: Any, *, default: bool = False) -> bool:
+    """Выполняет функцию truthy_flag."""
     if value is None:
         return default
     if isinstance(value, bool):
@@ -77,6 +78,7 @@ def create_telegram_request(env: Optional[dict[str, str]] = None) -> HTTPXReques
         env = dict(os.environ)
 
     def _timeout(name: str, default: float) -> Optional[float]:
+        """Выполняет функцию _timeout."""
         raw = env.get(name)
         if raw is None:
             return default
@@ -124,6 +126,7 @@ def create_telegram_request(env: Optional[dict[str, str]] = None) -> HTTPXReques
 
 
 def load_admins(base_dir: Optional[Path] = None, *, candidates: Optional[Iterable[Path]] = None) -> Tuple[set[int], set[str]]:
+    """Выполняет функцию load_admins."""
     base = base_dir or Path(__file__).resolve().parent
     if candidates is None:
         candidates = (

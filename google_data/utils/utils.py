@@ -1,11 +1,12 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
 
 
-# Определяет корректный путь к файлу сервисного аккаунта
+                                                        
 def resolve_service_account_path(path: Optional[str]) -> Optional[str]:
+    """Находит фактический путь к файлу сервисного аккаунта относительно проекта."""
     if not path:
         return None
     try:
