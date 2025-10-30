@@ -9,6 +9,7 @@ from media_store import persist_media_from_url
 
 
 def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
+    """Выполняет функцию normalize_telegram_link."""
     if not raw:
         return None
     value = str(raw).strip()
@@ -24,6 +25,7 @@ def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
 
 
 def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
+    """Выполняет функцию extract_telegram_username."""
     if not raw:
         return None
     value = str(raw).strip()
@@ -37,10 +39,12 @@ def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
 
 
 def _is_http_url(value: Optional[str]) -> bool:
+    """Выполняет функцию _is_http_url."""
     return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
 
 
 def process_cv(conn: connection, user_id: int, cv_value: Optional[str]) -> Optional[str]:
+    """Выполняет функцию process_cv."""
     value = (cv_value or "").strip()
     if not value:
         return None

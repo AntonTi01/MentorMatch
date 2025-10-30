@@ -15,8 +15,9 @@ from .services.db import get_conn
 from .workflows.sheet_pairs import sync_roles_sheet
 
 
-# Настраивает уровень логирования сервиса google_data
+                                                     
 def _configure_logging() -> logging.Logger:
+    """Настраивает логирование сервиса Google Data и возвращает корневой логгер."""
     level_name = (os.getenv("LOG_LEVEL") or "INFO").upper()
     logging.basicConfig(
         level=getattr(logging, level_name, logging.INFO),
@@ -39,14 +40,16 @@ class ExportPairsPayload(BaseModel):
 
 
 @app.get("/health", response_class=JSONResponse)
-# Возвращает информацию о готовности сервиса
+                                            
 def health_check() -> dict[str, str]:
+    """Возвращает статус готовности сервиса для проверок инфраструктуры."""
     return {"status": "ok"}
 
 
 @app.post("/api/export/pairs", response_class=JSONResponse)
-# Выгружает пары ролей и тем в указанную таблицу Google
+                                                       
 def export_pairs(payload: ExportPairsPayload) -> JSONResponse:
+    """Экспортирует пары студентов и наставников в Google Sheets."""
     spreadsheet_id = (
         (payload.spreadsheet_id or "").strip()
         or os.getenv("PAIRS_SPREADSHEET_ID")

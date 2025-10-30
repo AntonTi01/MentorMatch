@@ -17,8 +17,9 @@ from ..utils.topic_extraction import extract_topics_from_text, fallback_extract_
 logger = logging.getLogger(__name__)
 
 
-# Преобразует любые формы ссылок Telegram в нормализованный URL
+                                                               
 def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
+    """Преобразует ввод пользователя в каноническую ссылку Telegram."""
     if not raw:
         return None
     value = str(raw).strip()
@@ -33,8 +34,9 @@ def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
     return f"https://t.me/{username}" if username else None
 
 
-# Извлекает имя пользователя Telegram без схемы и префиксов
+                                                           
 def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
+    """Извлекает username Telegram из текста анкеты."""
     if not raw:
         return None
     value = str(raw).strip()
@@ -47,13 +49,15 @@ def extract_telegram_username(raw: Optional[str]) -> Optional[str]:
     return username or None
 
 
-# Проверяет, является ли значение HTTP-ссылкой
+                                              
 def _is_http_url(value: Optional[str]) -> bool:
+    """Проверяет, начинается ли значение со схемы HTTP или HTTPS."""
     return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
 
 
-# Обрабатывает значение резюме и при необходимости сохраняет файл локально
+                                                                          
 def process_cv(conn: connection, user_id: int, cv_value: Optional[str]) -> Optional[str]:
+    """Скачивает резюме по ссылке и сохраняет его в медиахранилище."""
     value = (cv_value or "").strip()
     if not value:
         return None
@@ -69,19 +73,21 @@ def process_cv(conn: connection, user_id: int, cv_value: Optional[str]) -> Optio
     return cv_value
 
 
-# Объединяет элементы списка через запятую
+                                          
 def _comma_join(items: Optional[Sequence[str]]) -> Optional[str]:
+    """Объединяет непустые элементы списка через запятую."""
     if not items:
         return None
     parts = [str(item).strip() for item in items if str(item).strip()]
     return ", ".join(parts) or None
 
 
-# Импортирует студентов и их профили из набора строк
+                                                    
 def import_students(
     conn: connection,
     rows: Iterable[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """Импортирует студентов из анкет, создавая пользователей, профили и темы."""
     inserted_users = 0
     inserted_profiles = 0
     inserted_topics = 0
@@ -271,11 +277,12 @@ def import_students(
         },
     }
 
-# Импортирует наставников и их темы из набора строк
+                                                   
 def import_supervisors(
     conn: connection,
     rows: Iterable[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """Импортирует наставников и их темы из анкет Google Forms."""
     inserted_users = 0
     upserted_profiles = 0
     inserted_topics = 0
@@ -358,8 +365,9 @@ def import_supervisors(
                 needs_supervisor_refresh = True
             upserted_profiles += 1
 
-            # Преобразует свободный текст в темы и сохраняет их в базе
+                                                                      
             def _insert_from_text(text: Optional[str], direction: Optional[int]) -> None:
+                """Разбирает текст описания и добавляет темы наставника в базу."""
                 nonlocal inserted_topics
                 if not text or not text.strip():
                     return

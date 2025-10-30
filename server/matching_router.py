@@ -1,4 +1,4 @@
-"""Router exposing matching actions for administrators."""
+"""Маршруты для запуска операций сопоставления администраторами."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Form
@@ -13,28 +13,33 @@ from clients.matching_client import (
 
 
 def create_matching_router() -> APIRouter:
+    """Создаёт роутер FastAPI для административных операций подбора."""
     router = APIRouter()
 
     @router.post("/match-topic", response_class=JSONResponse)
     def match_topic(topic_id: int = Form(...), target_role: str = Form("student")):
+        """Запускает подбор по теме с указанной целевой ролью."""
         result = trigger_match_topic(topic_id, target_role=target_role)
         status = 200 if result.get("status") == "ok" else 400
         return JSONResponse(result, status_code=status)
 
     @router.post("/match-student", response_class=JSONResponse)
     def match_student(student_user_id: int = Form(...)):
+        """Вызывает подбор наставника для выбранного студента."""
         result = trigger_match_student(student_user_id)
         status = 200 if result.get("status") == "ok" else 400
         return JSONResponse(result, status_code=status)
 
     @router.post("/match-supervisor", response_class=JSONResponse)
     def match_supervisor(supervisor_user_id: int = Form(...)):
+        """Вызывает подбор студентов для выбранного наставника."""
         result = trigger_match_supervisor(supervisor_user_id)
         status = 200 if result.get("status") == "ok" else 400
         return JSONResponse(result, status_code=status)
 
     @router.post("/match-role", response_class=JSONResponse)
     def match_role(role_id: int = Form(...)):
+        """Запускает подбор пользователей для выбранной роли."""
         result = trigger_match_role(role_id)
         status = 200 if result.get("status") == "ok" else 400
         return JSONResponse(result, status_code=status)

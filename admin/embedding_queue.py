@@ -13,16 +13,19 @@ _queue_store: Dict[int, List[Tuple[str, int]]] = {}
 
 
 def _drain_queue(conn) -> List[Tuple[str, int]]:
-    # Pop to avoid leaking queues for finished transactions.
+    """Забирает и очищает накопленные задачи обновления для соединения."""
+                                                            
     return list(_queue_store.pop(id(conn), []))
 
 
 def enqueue_refresh(conn, kind: str, entity_id: int) -> None:
+    """Добавляет задачу обновления эмбеддинга в очередь для текущего соединения."""
     queue = _queue_store.setdefault(id(conn), [])
     queue.append((kind, entity_id))
 
 
 def commit_with_refresh(conn) -> None:
+    """Фиксирует транзакцию и инициирует обновление эмбеддингов из очереди."""
     conn.commit()
     queue = _drain_queue(conn)
     for kind, entity_id in queue:

@@ -16,8 +16,9 @@ LLM_TEMPERATURE = float(os.getenv("MATCHING_LLM_TEMPERATURE", "0.2"))
 logger = logging.getLogger(__name__)
 
 
-# Функция _create_openai_client обрабатывает данные тем
+                                                       
 def _create_openai_client() -> Optional[OpenAI]:
+    """Создаёт клиента OpenAI через прокси-конфигурацию для извлечения тем."""
     if not (PROXY_API_KEY and PROXY_BASE_URL):
         return None
     try:
@@ -27,8 +28,9 @@ def _create_openai_client() -> Optional[OpenAI]:
         return None
 
 
-# Функция extract_topics_from_text обрабатывает данные тем
+                                                          
 def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
+    """Выделяет структурированные темы из произвольного текста через LLM."""
     clean = (text or "").strip()
     if not clean:
         return None
@@ -128,8 +130,9 @@ def extract_topics_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
     return normalised or None
 
 
-# Функция fallback_extract_topics обрабатывает данные тем
+                                                         
 def fallback_extract_topics(text: str) -> List[Dict[str, Any]]:
+    """Формирует список тем простым разбиением текста, когда LLM недоступен."""
     if not text:
         return []
     parts = re.split(r"[\n;\-\u2022]+|\s{2,}", text)

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_topic(conn: connection, topic_id: int) -> Optional[Dict[str, Any]]:
+    """Выполняет функцию fetch_topic."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -26,6 +27,7 @@ def fetch_topic(conn: connection, topic_id: int) -> Optional[Dict[str, Any]]:
 
 
 def fetch_role(conn: connection, role_id: int) -> Optional[Dict[str, Any]]:
+    """Выполняет функцию fetch_role."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -60,6 +62,7 @@ def fetch_role(conn: connection, role_id: int) -> Optional[Dict[str, Any]]:
 def fetch_candidates(
     conn: connection, topic_id: int, target_role: str, *, limit: int = 20
 ) -> List[Dict[str, Any]]:
+    """Выполняет функцию fetch_candidates."""
     role = (target_role or "student").lower()
     role = role if role in ("student", "supervisor") else "student"
 
@@ -156,6 +159,7 @@ def fetch_candidates(
 
 
 def fetch_student(conn: connection, student_user_id: int) -> Optional[Dict[str, Any]]:
+    """Выполняет функцию fetch_student."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -174,6 +178,7 @@ def fetch_student(conn: connection, student_user_id: int) -> Optional[Dict[str, 
 
 
 def fetch_topics_needing_students(conn: connection, limit: int = 20) -> List[Dict[str, Any]]:
+    """Выполняет функцию fetch_topics_needing_students."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -193,6 +198,7 @@ def fetch_topics_needing_students(conn: connection, limit: int = 20) -> List[Dic
 def fetch_roles_needing_students(
     conn: connection, student_user_id: int, limit: int = 40
 ) -> List[Dict[str, Any]]:
+    """Выполняет функцию fetch_roles_needing_students."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -256,6 +262,7 @@ def fetch_roles_needing_students(
 
 
 def fetch_supervisor(conn: connection, supervisor_user_id: int) -> Optional[Dict[str, Any]]:
+    """Выполняет функцию fetch_supervisor."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
@@ -274,6 +281,7 @@ def fetch_supervisor(conn: connection, supervisor_user_id: int) -> Optional[Dict
 def fetch_topics_needing_supervisors(
     conn: connection, supervisor_user_id: int, limit: int = 20
 ) -> List[Dict[str, Any]]:
+    """Выполняет функцию fetch_topics_needing_supervisors."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """

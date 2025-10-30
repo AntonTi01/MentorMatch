@@ -7,6 +7,7 @@ from .views import dashboard, imports, matching, requests, topics, users
 
 
 def create_admin_router(get_conn, templates) -> APIRouter:
+    """Создаёт административный роутер и регистрирует модули представлений."""
     ctx = AdminContext(get_conn=get_conn, templates=templates)
     router = APIRouter()
 

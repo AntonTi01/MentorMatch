@@ -7,6 +7,7 @@ from psycopg2.extensions import connection
 
 
 def build_db_dsn() -> str:
+    """Выполняет функцию build_db_dsn."""
     dsn = os.getenv("DATABASE_URL")
     if dsn:
         return dsn
@@ -19,6 +20,7 @@ def build_db_dsn() -> str:
 
 
 def get_conn() -> connection:
+    """Выполняет функцию get_conn."""
     return psycopg2.connect(build_db_dsn())
 
 

@@ -12,11 +12,13 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media")).resolve()
 
 
 def _ensure_media_root() -> Path:
+    """Создаёт директорию для медиафайлов, если она ещё не существует."""
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
     return MEDIA_ROOT
 
 
 def _normalize_drive_url(url: str) -> str:
+    """Преобразует ссылки Google Drive к прямому URL скачивания."""
     match = re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
     if match:
         return f"https://drive.google.com/uc?export=download&id={match.group(1)}"
@@ -27,6 +29,7 @@ def _normalize_drive_url(url: str) -> str:
 
 
 def _guess_filename(url: str, content_disposition: Optional[str]) -> str:
+    """Определяет имя файла по заголовку ответа или по ссылке."""
     if content_disposition:
         encoded = re.search(r"filename\\*=UTF-8''([^;]+)", content_disposition)
         if encoded:
@@ -39,11 +42,13 @@ def _guess_filename(url: str, content_disposition: Optional[str]) -> str:
 
 
 def _safe_name(name: str) -> str:
+    """Очищает имя файла от опасных символов и ограничивает длину."""
     name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
     return name[:200]
 
 
 def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, category: str = "cv") -> Tuple[int, str]:
+    """Скачивает файл по URL, сохраняет его в хранилище и регистрирует в БД."""
     if not url or not url.strip():
         raise ValueError("empty url")
     url = url.strip()

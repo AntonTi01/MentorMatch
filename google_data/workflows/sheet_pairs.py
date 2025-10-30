@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 HEADERS_RU = ["Тема", "Роль", "Студент", "Наставник"]
 
 
-# Открывает рабочий лист Google Sheets по идентификатору таблицы
+                                                                
 def _open_ws(spreadsheet_id: str, service_account_file: str):
+    """Открывает лист Google Sheets для записи результатов экспорта."""
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_file(str(service_account_file), scopes=scopes)
     gc = gspread.authorize(creds)
@@ -27,8 +28,9 @@ def _open_ws(spreadsheet_id: str, service_account_file: str):
     return ws
 
 
-# Выгружает пары тем и ролей из базы и записывает их в Google Sheet
+                                                                   
 def export_pairs_from_db(conn, spreadsheet_id: str, service_account_file: str) -> int:
+    """Выгружает пары тема-рólь-студент-наставник из базы в таблицу."""
     rows: List[List[str]] = [HEADERS_RU]
     samples: List[List[str]] = []
     with conn.cursor() as cur:
@@ -76,7 +78,7 @@ def export_pairs_from_db(conn, spreadsheet_id: str, service_account_file: str) -
     return data_rows
 
 
-# Синхронизирует таблицу ролей с актуальными данными из базы
+                                                            
 def sync_roles_sheet(
     get_conn: Callable[[], Any],
     spreadsheet_id: Optional[str] = None,
@@ -84,6 +86,7 @@ def sync_roles_sheet(
     *,
     conn=None,
 ) -> bool:
+    """Организует экспорт пар в Google Sheet, создавая соединение при необходимости."""
     sid = (spreadsheet_id or os.getenv("PAIRS_SPREADSHEET_ID") or "").strip()
     if not sid:
         logger.warning("Roles sheet sync skipped: spreadsheet ID is not configured")

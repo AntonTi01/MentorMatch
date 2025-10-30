@@ -33,11 +33,13 @@ _MODEL_CACHE: Dict[str, "EmbeddingModel"] = {}
 
 
 def _should_use_sentence_transformers(repo_id: str) -> bool:
+    """Выполняет функцию _should_use_sentence_transformers."""
     name = repo_id.lower()
     return "cointegrated/rubert-tiny2" not in name
 
 
 def _model_cache_dir(repo_id: str) -> Path:
+    """Выполняет функцию _model_cache_dir."""
     safe_name = repo_id.replace("/", "__")
     cache_dir = MODELS_DIR / safe_name
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -53,15 +55,17 @@ class EmbeddingModel:
     tokenizer: Optional[AutoTokenizer] = None
 
     def __post_init__(self) -> None:
+        """Выполняет функцию __post_init__."""
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if self.backend == "sentence-transformers":
-            # SentenceTransformer expects device as a string identifier.
+                                                                        
             self.model.to(str(self.device))
         else:
             self.model.to(self.device)
         self.output_dimension = self._infer_output_dimension()
 
     def _infer_output_dimension(self) -> int:
+        """Выполняет функцию _infer_output_dimension."""
         if self.backend == "sentence-transformers":
             return self.model.get_sentence_embedding_dimension()
         return int(getattr(self.model.config, "hidden_size", 0))
@@ -74,6 +78,7 @@ class EmbeddingModel:
         revision: Optional[str] = None,
         token: Optional[str] = None,
     ) -> "EmbeddingModel":
+        """Выполняет функцию from_pretrained."""
         backend = (
             "sentence-transformers"
             if _should_use_sentence_transformers(repo_id)
@@ -116,6 +121,7 @@ class EmbeddingModel:
         normalize: bool = True,
         batch_size: Optional[int] = None,
     ) -> np.ndarray:
+        """Выполняет функцию encode."""
         batched_texts, single_input = _ensure_batched(texts)
         if self.backend == "sentence-transformers":
             encode_kwargs = {
@@ -141,6 +147,7 @@ class EmbeddingModel:
         *,
         normalize: bool,
     ) -> np.ndarray:
+        """Выполняет функцию _encode_with_transformers."""
         if self.tokenizer is None:
             raise RuntimeError("Tokenizer is not initialised for transformers backend.")
         inputs = self.tokenizer(
@@ -165,12 +172,14 @@ class EmbeddingModel:
 
 
 def _ensure_batched(texts: Union[str, Sequence[str]]) -> Tuple[Sequence[str], bool]:
+    """Выполняет функцию _ensure_batched."""
     if isinstance(texts, str):
         return [texts], True
     return list(texts), False
 
 
 def _vector_to_pgvector(vector: np.ndarray) -> str:
+    """Выполняет функцию _vector_to_pgvector."""
     return "[" + ",".join(f"{float(x):.8f}" for x in vector.tolist()) + "]"
 
 
@@ -178,6 +187,7 @@ def _mean_pooling(
     last_hidden_state: torch.Tensor,
     attention_mask: torch.Tensor,
 ) -> torch.Tensor:
+    """Выполняет функцию _mean_pooling."""
     mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
     masked_embeddings = last_hidden_state * mask
     sum_embeddings = torch.sum(masked_embeddings, dim=1)
@@ -191,6 +201,7 @@ def load_embedding_model(
     revision: Optional[str] = None,
     token: Optional[str] = None,
 ) -> EmbeddingModel:
+    """Выполняет функцию load_embedding_model."""
     if repo_id not in ALLOWED_REPO_IDS:
         raise ValueError(f"Model {repo_id} is not whitelisted for download.")
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -202,6 +213,7 @@ def load_embedding_model(
 
 
 def _get_cached_model(repo_id: str) -> EmbeddingModel:
+    """Выполняет функцию _get_cached_model."""
     model = _MODEL_CACHE.get(repo_id)
     if model is None:
         model = load_embedding_model(repo_id)
@@ -210,12 +222,14 @@ def _get_cached_model(repo_id: str) -> EmbeddingModel:
 
 
 def _extract_value(entity: Union[Mapping[str, Any], Any], key: str) -> Any:
+    """Выполняет функцию _extract_value."""
     if isinstance(entity, Mapping):
         return entity.get(key)
     return getattr(entity, key, None)
 
 
 def _stringify_parts(parts: Sequence[Any]) -> str:
+    """Выполняет функцию _stringify_parts."""
     serialized: List[str] = []
     for value in parts:
         if value in (None, "", [], ()):
@@ -232,6 +246,7 @@ def _stringify_parts(parts: Sequence[Any]) -> str:
 
 
 def _build_entity_text(entity: Union[Mapping[str, Any], Any], entity_type: str) -> str:
+    """Выполняет функцию _build_entity_text."""
     entity_type = (entity_type or "").strip().lower()
     if entity_type not in {"student", "supervisor", "topic", "role"}:
         raise ValueError(f"Unsupported entity type: {entity_type}")
@@ -334,6 +349,7 @@ def _build_entity_text(entity: Union[Mapping[str, Any], Any], entity_type: str) 
 def _resolve_storage(
     entity: Union[Mapping[str, Any], Any], entity_type: str
 ) -> Tuple[str, str, Any]:
+    """Выполняет функцию _resolve_storage."""
     entity_type = (entity_type or "").strip().lower()
     if entity_type in {"student", "supervisor"}:
         table = "users"
@@ -403,7 +419,8 @@ def refresh_student_embedding(
     normalize: bool = True,
     commit: bool = False,
 ) -> Optional[np.ndarray]:
-    from .repository import fetch_student  # Local import to avoid circular dependency.
+    """Выполняет функцию refresh_student_embedding."""
+    from .repository import fetch_student                                              
 
     student = fetch_student(conn, student_user_id)
     if not student:
@@ -426,6 +443,7 @@ def refresh_supervisor_embedding(
     normalize: bool = True,
     commit: bool = False,
 ) -> Optional[np.ndarray]:
+    """Выполняет функцию refresh_supervisor_embedding."""
     from .repository import fetch_supervisor
 
     supervisor = fetch_supervisor(conn, supervisor_user_id)
@@ -449,6 +467,7 @@ def refresh_topic_embedding(
     normalize: bool = True,
     commit: bool = False,
 ) -> Optional[np.ndarray]:
+    """Выполняет функцию refresh_topic_embedding."""
     from .repository import fetch_topic
 
     topic = fetch_topic(conn, topic_id)
@@ -472,6 +491,7 @@ def refresh_role_embedding(
     normalize: bool = True,
     commit: bool = False,
 ) -> Optional[np.ndarray]:
+    """Выполняет функцию refresh_role_embedding."""
     from .repository import fetch_role
 
     role = fetch_role(conn, role_id)
@@ -493,6 +513,7 @@ def pull_model(
     revision: Optional[str] = None,
     token: Optional[str] = None,
 ) -> Dict[str, str]:
+    """Выполняет функцию pull_model."""
     model = load_embedding_model(
         repo_id,
         revision=revision,

@@ -6,6 +6,7 @@ from .media_store import persist_media_from_url
 
 
 def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
+    """Приводит Telegram-логин или ссылку к единому формату https://t.me/<user>."""
     if not raw:
         return None
     s = (raw or "").strip()
@@ -22,10 +23,12 @@ def normalize_telegram_link(raw: Optional[str]) -> Optional[str]:
 
 
 def is_http_url(value: Optional[str]) -> bool:
+    """Проверяет, начинается ли строка со схемы HTTP(S)."""
     return bool(value) and str(value).strip().lower().startswith(("http://", "https://"))
 
 
 def process_cv(conn, user_id: int, cv_val: Optional[str]) -> Optional[str]:
+    """Скачивает и сохраняет резюме пользователя, возвращая публичный путь."""
     val = (cv_val or "").strip()
     if not val:
         return None
@@ -35,7 +38,7 @@ def process_cv(conn, user_id: int, cv_val: Optional[str]) -> Optional[str]:
         try:
             _mid, public = persist_media_from_url(conn, user_id, val, category="cv")
             return public
-        except Exception as exc:  # pragma: no cover - logging side-effect
+        except Exception as exc:                                          
             print(f"CV download failed for user {user_id}: {exc}")
             return cv_val
     return cv_val

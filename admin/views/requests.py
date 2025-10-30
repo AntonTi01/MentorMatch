@@ -12,6 +12,7 @@ from ..context import AdminContext
 
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
+    """Регистрирует обработчики заявок в административном роутере."""
     @router.post('/send-request')
     def send_request(
         sender_user_id: int = Form(...),
@@ -21,7 +22,9 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         role_id: Optional[str] = Form(None),
         return_url: str = Form('/'),
     ):
+        """Создаёт заявку между пользователями и перенаправляет с сообщением."""
         def _redirect(target: Optional[str], message: str) -> RedirectResponse:
+            """Формирует URL редиректа с передачей сообщения пользователю."""
             base = (target or '/').strip() or '/'
             anchor = ''
             if '#' in base:
@@ -61,5 +64,5 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 msg_id = cur.fetchone()[0]
                 conn.commit()
             return _redirect(return_url, f'Заявка отправлена (#{msg_id})')
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:                    
             return _redirect(return_url, f'Ошибка отправки заявки: {type(exc).__name__}')

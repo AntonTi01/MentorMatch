@@ -11,6 +11,7 @@ from telegram.ext import (
 
 
 def setup(application: Application, bot) -> None:
+    """Выполняет функцию setup."""
     application.add_handler(CommandHandler("start", bot.cmd_start2))
     application.add_handler(CommandHandler("help", bot.cmd_help))
 

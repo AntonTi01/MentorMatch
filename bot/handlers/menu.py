@@ -14,9 +14,11 @@ logger = logging.getLogger(__name__)
 
 class MenuHandlers(BaseHandlers):
     async def cmd_start2(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_start2."""
         return await self.cmd_start(update, context)
 
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_start."""
         context.user_data.pop("awaiting", None)
         context.user_data.pop("topic_role", None)
         for key in (
@@ -136,6 +138,7 @@ class MenuHandlers(BaseHandlers):
             )
 
     async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cmd_help."""
         await update.message.reply_text(
             self._fix_text(
                 "Разделы: Студенты, Научные руководители, Темы. В профиле студента — кнопка Подобрать тему. "
@@ -144,6 +147,7 @@ class MenuHandlers(BaseHandlers):
         )
 
     async def _show_role_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию _show_role_menu."""
         raw_role = context.user_data.get("role")
         role = self._normalize_role_value(raw_role) or raw_role
         uid = context.user_data.get("uid")
@@ -201,6 +205,7 @@ class MenuHandlers(BaseHandlers):
             )
 
     async def _roles_stats_line(self) -> Optional[str]:
+        """Выполняет функцию _roles_stats_line."""
         stats = await self._api_get("/api/roles/stats") or {}
         if not isinstance(stats, dict):
             return None
@@ -212,8 +217,10 @@ class MenuHandlers(BaseHandlers):
         return f"Осталось свободных ролей {available}/{total}"
 
     async def cb_back(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_back."""
         context.user_data.pop("messages_cache", None)
         await self.cmd_start(update, context)
 
     async def on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию on_error."""
         logger.exception("Handler error", exc_info=context.error)

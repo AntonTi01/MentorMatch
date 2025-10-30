@@ -1,4 +1,4 @@
-﻿"""Entity and profile handlers."""
+"""Entity and profile handlers."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -11,20 +11,23 @@ from .base import BaseHandlers
 
 class EntityHandlers(BaseHandlers):
     async def cb_student_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_student_me."""
         uid = context.user_data.get('uid')
         if not uid:
             return await self.cmd_start(update, context)
-        # Reuse existing handler without mutating Telegram objects
+                                                                  
         await self.cb_view_student(update, context)
 
     async def cb_supervisor_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_supervisor_me."""
         uid = context.user_data.get('uid')
         if not uid:
             return await self.cmd_start(update, context)
-        # Reuse existing handler without mutating Telegram objects
+                                                                  
         await self.cb_view_supervisor(update, context)
 
     async def cb_my_topics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_my_topics."""
         q = update.callback_query; await self._answer_callback(q)
         uid = context.user_data.get('uid')
         if not uid:
@@ -83,15 +86,17 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_match_topics_for_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_match_topics_for_me."""
         q = update.callback_query; await self._answer_callback(q)
         uid = context.user_data.get('uid')
         if not uid:
             return await self.cmd_start(update, context)
-        # Delegate without altering callback data
+                                                 
         await self.cb_match_topics_for_supervisor(update, context)
 
-    # Lists
+           
     async def cb_list_students(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_students."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/students?limit=10') or []
         lines: List[str] = ['Студенты:']
@@ -103,6 +108,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_supervisors(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_supervisors."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/supervisors?limit=10') or []
         lines: List[str] = ['Научные руководители:']
@@ -114,6 +120,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_topics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_topics."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/topics?limit=10') or []
         lines: List[str] = ['Темы:']
@@ -125,10 +132,11 @@ class EntityHandlers(BaseHandlers):
         kb.append([InlineKeyboardButton('⬅️ Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
-    # Profiles
+              
     async def cb_view_student(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_view_student."""
         q = update.callback_query; await self._answer_callback(q)
-        # Parse student id from callback data, or fallback to current user
+                                                                          
         try:
             sid = int(q.data.split('_')[1])
         except Exception:
@@ -143,7 +151,7 @@ class EntityHandlers(BaseHandlers):
         is_admin = self._is_admin(update)
         is_self = self._ids_equal(viewer_id, sid)
         can_edit = is_admin or is_self
-        # Header
+                
         lines = [
             f"Студент: {s.get('full_name','–')}",
             f"Username: {s.get('username') or '–'}",
@@ -154,11 +162,11 @@ class EntityHandlers(BaseHandlers):
             f"CV: {(s.get('cv') or '–')[:200]}",
             f"ID: {s.get('id')}",
         ]
-        # Existing recommendations from DB
+                                          
         rec = await self._api_get(f'/api/user-candidates/{sid}?limit=5') or []
         if rec:
             lines.append('')
-            # Back-compat: endpoint возвращает роли для студента
+                                                                
             if rec and 'role_name' in (rec[0] or {}):
                 lines.append('Рекомендованные роли:')
                 for it in rec:
@@ -177,6 +185,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
     async def cb_edit_student_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_edit_student_start."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             sid = int(q.data.split('_')[2])
@@ -211,8 +220,9 @@ class EntityHandlers(BaseHandlers):
         await q.message.reply_text(self._fix_text(prompt))
 
     async def cb_view_supervisor(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_view_supervisor."""
         q = update.callback_query; await self._answer_callback(q)
-        # Parse supervisor id from callback data, or fallback to current user
+                                                                             
         try:
             uid = int(q.data.split('_')[1])
         except Exception:
@@ -286,6 +296,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
     async def cb_edit_supervisor_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_edit_supervisor_start."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             uid = int(q.data.split('_')[2])
@@ -320,6 +331,7 @@ class EntityHandlers(BaseHandlers):
         await q.message.reply_text(self._fix_text(prompt))
 
     async def cb_view_topic(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_view_topic."""
         q = update.callback_query; await self._answer_callback(q)
         tid = int(q.data.split('_')[1])
         t = await self._api_get(f'/api/topics/{tid}')
@@ -348,7 +360,7 @@ class EntityHandlers(BaseHandlers):
             f"Требуемые навыки: {t.get('required_skills') or '–'}\n"
             f"ID: {t.get('id')}\n"
         )
-        # Roles for this topic
+                              
         roles = await self._api_get(f'/api/topics/{tid}/roles') or []
         lines2: List[str] = [text, '', 'Роли:']
         kb: List[List[InlineKeyboardButton]] = []
@@ -382,6 +394,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines2)), reply_markup=self._mk(kb))
 
     async def cb_view_role(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_view_role."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             rid = int(q.data.split('_')[1])
@@ -472,6 +485,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_apply_role(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_apply_role."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             rid = int(q.data.rsplit('_', 1)[1])
@@ -535,6 +549,7 @@ class EntityHandlers(BaseHandlers):
         await q.message.reply_text(self._fix_text(prompt))
 
     async def cb_apply_topic(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_apply_topic."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             tid = int(q.data.rsplit('_', 1)[1])
@@ -631,6 +646,7 @@ class EntityHandlers(BaseHandlers):
         await q.message.reply_text(self._fix_text(prompt))
 
     async def cb_edit_topic_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_edit_topic_start."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             tid = int(q.data.split('_')[2])
@@ -670,6 +686,7 @@ class EntityHandlers(BaseHandlers):
         await q.message.reply_text(self._fix_text(prompt))
 
     async def cb_edit_role_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_edit_role_start."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             rid = int(q.data.split('_')[2])
@@ -700,8 +717,9 @@ class EntityHandlers(BaseHandlers):
         )
         await q.message.reply_text(self._fix_text(prompt))
 
-    # Matching
+              
     async def cb_match_student(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_match_student."""
         q = update.callback_query; await self._answer_callback(q)
         sid = int(q.data.split('_')[2])
         viewer_id = context.user_data.get('uid')
@@ -741,8 +759,9 @@ class EntityHandlers(BaseHandlers):
         kb.append([InlineKeyboardButton('Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
-    # Messages (applications)
+                             
     async def cb_messages_inbox(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_messages_inbox."""
         q = update.callback_query; await self._answer_callback(q)
         uid = context.user_data.get('uid')
         if uid is None:
@@ -808,6 +827,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_messages_outbox(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_messages_outbox."""
         q = update.callback_query; await self._answer_callback(q)
         uid = context.user_data.get('uid')
         if uid is None:
@@ -873,6 +893,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_message_view(self, update: Update, context: ContextTypes.DEFAULT_TYPE, *, message_id: Optional[int] = None, refresh: bool = False, notice: Optional[str] = None):
+        """Выполняет функцию cb_message_view."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             mid = message_id if message_id is not None else int(q.data.rsplit('_', 1)[1])
@@ -895,6 +916,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
     async def cb_message_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_message_action."""
         q = update.callback_query
         data = (q.data or '').split('_')
         if len(data) < 3:
@@ -937,6 +959,7 @@ class EntityHandlers(BaseHandlers):
             await q.edit_message_text(self._fix_text(fallback), reply_markup=self._mk(kb))
 
     def _store_messages_cache(self, context: ContextTypes.DEFAULT_TYPE, messages: List[Dict[str, Any]], *, source: str, list_callback: str) -> None:
+        """Выполняет функцию _store_messages_cache."""
         cache = context.user_data.setdefault('messages_cache', {})
         for msg in messages or []:
             mid = msg.get('id')
@@ -948,6 +971,7 @@ class EntityHandlers(BaseHandlers):
             cache[str(mid)] = entry
 
     async def _get_message_details(self, context: ContextTypes.DEFAULT_TYPE, user_id: Any, message_id: int, *, refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Выполняет функцию _get_message_details."""
         cache = context.user_data.setdefault('messages_cache', {})
         key = str(message_id)
         if not refresh and key in cache:
@@ -972,6 +996,7 @@ class EntityHandlers(BaseHandlers):
         viewer_id: Any,
         notice: Optional[str] = None,
     ) -> tuple[str, List[List[InlineKeyboardButton]]]:
+        """Выполняет функцию _build_message_view."""
         status_labels = {
             'pending': 'ожидает решения',
             'accepted': 'принята',
@@ -1012,6 +1037,7 @@ class EntityHandlers(BaseHandlers):
             lines.append(answer)
         kb: List[List[InlineKeyboardButton]] = []
         def _same_user(a: Any, b: Any) -> bool:
+            """Выполняет функцию _same_user."""
             try:
                 return int(a) == int(b)
             except Exception:
@@ -1032,8 +1058,9 @@ class EntityHandlers(BaseHandlers):
         kb.append([InlineKeyboardButton(back_label, callback_data=back_cb)])
         return '\n'.join(lines), kb
 
-    # Import students from Google Sheets
+                                        
     async def cb_import_students(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_import_students."""
         q = update.callback_query; await self._answer_callback(q)
         cfg = await self._api_get('/api/sheets-config')
         if not cfg or cfg.get('status') != 'configured':
@@ -1042,12 +1069,12 @@ class EntityHandlers(BaseHandlers):
             await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
             return
         sid = cfg.get('spreadsheet_id')
-        # Provide immediate feedback so UI doesn't look frozen
+                                                              
         try:
             await q.edit_message_text(self._fix_text('Import started... This may take up to 2-3 minutes.'))
         except Exception:
             pass
-        # Allow longer timeout for imports (downloads + DB work)
+                                                                
         res = await self._api_post('/api/import-sheet', data={'spreadsheet_id': sid}, timeout=300)
         if not res or res.get('status') != 'success':
             msg = (res or {}).get('message') or 'Ошибка импорта'
@@ -1063,8 +1090,9 @@ class EntityHandlers(BaseHandlers):
         kb = [[InlineKeyboardButton('👨‍🎓 К студентам', callback_data='list_students')]]
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
-    # List menus with add buttons (new handlers)
+                                                
     async def cb_list_students_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_students_menu."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/students?limit=10') or []
         lines: List[str] = ['Студенты:']
@@ -1079,6 +1107,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_supervisors_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_supervisors_menu."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/supervisors?limit=10') or []
         lines: List[str] = ['Научные руководители:']
@@ -1090,6 +1119,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_topics_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_topics_menu."""
         q = update.callback_query; await self._answer_callback(q)
         data = await self._api_get('/api/topics?limit=10') or []
         lines: List[str] = ['Темы:']
@@ -1100,8 +1130,9 @@ class EntityHandlers(BaseHandlers):
         kb.append([InlineKeyboardButton('⬅️ Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
-    # List menus with pagination navigation
+                                           
     async def cb_list_students_nav(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_students_nav."""
         q = update.callback_query; await self._answer_callback(q)
         offset = 0
         try:
@@ -1132,6 +1163,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_supervisors_nav(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_supervisors_nav."""
         q = update.callback_query; await self._answer_callback(q)
         offset = 0
         try:
@@ -1159,6 +1191,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
     async def cb_list_topics_nav(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_list_topics_nav."""
         q = update.callback_query; await self._answer_callback(q)
         offset = 0
         try:
@@ -1186,19 +1219,22 @@ class EntityHandlers(BaseHandlers):
         kb.append([InlineKeyboardButton('⬅️ Назад', callback_data='back_to_main')])
         await q.edit_message_text(self._fix_text('\n'.join(lines)), reply_markup=self._mk(kb))
 
-    # Add flows (simple)
+                        
     async def cb_add_student_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_add_student_info."""
         q = update.callback_query; await self._answer_callback(q)
         text = 'Добавление студентов выполняется через Google-форму и импорт в админке.'
         kb = [[InlineKeyboardButton('👨‍🎓 К студентам', callback_data='list_students')]]
         await q.edit_message_text(self._fix_text(text), reply_markup=self._mk(kb))
 
     async def cb_add_supervisor_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_add_supervisor_start."""
         q = update.callback_query; await self._answer_callback(q)
         context.user_data['awaiting'] = 'add_supervisor_name'
         await q.edit_message_text(self._fix_text('Введите ФИО научного руководителя сообщением. Для отмены — /start'))
 
     async def cb_add_topic_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_add_topic_start."""
         q = update.callback_query; await self._answer_callback(q)
         context.user_data['add_topic_payload'] = {}
         context.user_data['add_topic_endpoint'] = None
@@ -1210,6 +1246,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text('Выберите, кого ищет тема:'), reply_markup=self._mk(kb))
 
     async def cb_add_topic_choose(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_add_topic_choose."""
         q = update.callback_query; await self._answer_callback(q)
         role = 'student' if q.data.endswith('_student') else 'supervisor'
         context.user_data['awaiting'] = 'add_topic_title'
@@ -1222,6 +1259,7 @@ class EntityHandlers(BaseHandlers):
         )
 
     async def cb_add_role_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_add_role_start."""
         q = update.callback_query; await self._answer_callback(q)
         try:
             tid = int(q.data.rsplit('_', 1)[1])
@@ -1256,6 +1294,7 @@ class EntityHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text(prompt))
 
     async def on_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию on_text."""
         awaiting = context.user_data.get('awaiting')
         if not awaiting:
             return
@@ -1797,6 +1836,7 @@ class EntityHandlers(BaseHandlers):
         await update.message.reply_text(self._fix_text('Действие отменено. Начните заново /start.'))
 
     async def _finish_add_topic(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию _finish_add_topic."""
         payload: Dict[str, Any] = context.user_data.get('add_topic_payload') or {}
         endpoint = context.user_data.get('add_topic_endpoint') or '/api/add-topic'
         data: Dict[str, Any] = {}
@@ -1842,6 +1882,7 @@ class EntityHandlers(BaseHandlers):
             )
 
     async def _finish_edit_student(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию _finish_edit_student."""
         payload = context.user_data.get('edit_student_payload') or {}
         user_id = payload.get('user_id')
         if user_id is None:
@@ -1869,6 +1910,7 @@ class EntityHandlers(BaseHandlers):
         )
 
     async def _finish_edit_supervisor(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию _finish_edit_supervisor."""
         payload = context.user_data.get('edit_supervisor_payload') or {}
         user_id = payload.get('user_id')
         if user_id is None:
@@ -1902,6 +1944,7 @@ class EntityHandlers(BaseHandlers):
         )
 
     async def _finish_edit_topic(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию _finish_edit_topic."""
         payload = context.user_data.get('edit_topic_payload') or {}
         original = context.user_data.get('edit_topic_original') or {}
         topic_id = payload.get('topic_id')
@@ -1948,6 +1991,7 @@ class EntityHandlers(BaseHandlers):
         await update.message.reply_text(self._fix_text('Тема обновлена.'), reply_markup=self._mk(kb))
 
     async def _finish_edit_role(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Выполняет функцию _finish_edit_role."""
         payload = context.user_data.get('edit_role_payload') or {}
         original = context.user_data.get('edit_role_original') or {}
         role_id = payload.get('role_id')

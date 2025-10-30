@@ -12,8 +12,10 @@ from ..context import AdminContext
 
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
+    """Добавляет административные маршруты для импорта данных из таблиц."""
     @router.get('/import-sheet')
     def import_sheet(request: Request, target: Optional[str] = None, sheet_name: Optional[str] = None):
+        """Запускает импорт студентов или наставников и перенаправляет с результатом."""
         spreadsheet_id = (os.getenv('SPREADSHEET_ID') or '').strip()
         if not spreadsheet_id:
             notice = urllib.parse.quote('Не указан идентификатор таблицы SPREADSHEET_ID')
@@ -27,7 +29,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
             else:
                 result = import_students(spreadsheet_id, sheet_name)
                 tab = 'students'
-        except Exception as exc:  # pragma: no cover - network failures
+        except Exception as exc:                                       
             detail = urllib.parse.quote(f'Ошибка импорта: {type(exc).__name__}: {exc}')
             return RedirectResponse(url=f'/?tab={tab}&msg={detail}', status_code=303)
 

@@ -11,6 +11,7 @@ from .base import BaseHandlers
 
 class MatchingHandlers(BaseHandlers):
     async def cb_match_supervisor(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_match_supervisor."""
         q = update.callback_query
         await self._answer_callback(q)
         tid = int(q.data.split("_")[2])
@@ -62,6 +63,7 @@ class MatchingHandlers(BaseHandlers):
         await q.edit_message_text(self._fix_text("\n".join(lines)), reply_markup=self._mk(kb))
 
     async def cb_invite_supervisor(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Выполняет функцию cb_invite_supervisor."""
         q = update.callback_query
         await self._answer_callback(q)
         parts = (q.data or "").split("_")
@@ -154,6 +156,7 @@ class MatchingHandlers(BaseHandlers):
     async def cb_match_students_for_topic(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        """Выполняет функцию cb_match_students_for_topic."""
         q = update.callback_query
         await self._answer_callback(q)
         tid = int(q.data.rsplit("_", 1)[1])
@@ -182,6 +185,7 @@ class MatchingHandlers(BaseHandlers):
     async def cb_match_students_for_role(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        """Выполняет функцию cb_match_students_for_role."""
         q = update.callback_query
         await self._answer_callback(q)
         rid = int(q.data.rsplit("_", 1)[1])
@@ -223,6 +227,7 @@ class MatchingHandlers(BaseHandlers):
     async def cb_match_topics_for_supervisor(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
+        """Выполняет функцию cb_match_topics_for_supervisor."""
         q = update.callback_query
         await self._answer_callback(q)
         try:

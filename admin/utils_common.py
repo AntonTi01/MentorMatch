@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 def parse_optional_int(value: Optional[Any]) -> Optional[int]:
+    """Пытается привести значение к целому числу, возвращая ``None`` при пустом вводе."""
     if value is None:
         return None
     if isinstance(value, int):
@@ -19,6 +20,7 @@ def parse_optional_int(value: Optional[Any]) -> Optional[int]:
 
 
 def normalize_optional_str(value: Optional[Any]) -> Optional[str]:
+    """Очищает строку от пробелов и преобразует пустые значения в ``None``."""
     if value is None:
         return None
     if isinstance(value, str):

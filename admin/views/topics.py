@@ -13,10 +13,12 @@ from ..embedding_queue import enqueue_refresh, commit_with_refresh
 from ..utils_common import parse_optional_int
 
 def register(router: APIRouter, ctx: AdminContext) -> None:
+    """Подключает административные страницы управления темами и ролями."""
     templates = ctx.templates
 
     @router.get('/add-topic', response_class=HTMLResponse)
     def new_topic(request: Request, msg: Optional[str] = None):
+        """Показывает форму создания новой темы и выбор руководителя."""
         supervisors = _load_supervisors(ctx)
         return templates.TemplateResponse(
             'admin/topic_form.html',
@@ -42,6 +44,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         direction: Optional[str] = Form(None),
         seeking_role: str = Form('student'),
     ):
+        """Создаёт тему в базе и при необходимости заводит автора."""
         author_full_name = (author_full_name or '').strip()
         with ctx.get_conn() as conn, conn.cursor() as cur:
             topic_id_created: Optional[int] = None
@@ -97,6 +100,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/edit-topic/{topic_id}', response_class=HTMLResponse)
     def edit_topic(request: Request, topic_id: int, msg: Optional[str] = None):
+        """Открывает форму редактирования существующей темы."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -138,6 +142,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         seeking_role: str = Form('student'),
         is_active: Optional[str] = Form(None),
     ):
+        """Сохраняет изменения темы и обновляет её эмбеддинг."""
         active = str(is_active or '').lower() in ('1', 'true', 'on', 'yes', 'y')
         try:
             author_id = _ensure_author(ctx, author_user_id, author_full_name)
@@ -178,6 +183,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.post('/topics/{topic_id}/delete')
     def delete_topic(topic_id: int):
+        """Удаляет тему и перенаправляет администратора со статусом."""
         with ctx.get_conn() as conn, conn.cursor() as cur:
             cur.execute('DELETE FROM topics WHERE id=%s', (topic_id,))
         notice = urllib.parse.quote('Тема удалена')
@@ -185,6 +191,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/topic/{topic_id}', response_class=HTMLResponse)
     def view_topic(request: Request, topic_id: int, msg: Optional[str] = None):
+        """Показывает подробности темы и кандидатов в руководители."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -240,6 +247,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/add-role', response_class=HTMLResponse)
     def new_role(request: Request, topic_id: int):
+        """Отображает форму добавления роли к выбранной теме."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute('SELECT id, title FROM topics WHERE id=%s', (topic_id,))
             topic = cur.fetchone()
@@ -263,6 +271,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         required_skills: Optional[str] = Form(None),
         capacity: Optional[str] = Form(None),
     ):
+        """Создаёт новую роль и инициирует выгрузку в Google Sheets."""
         with ctx.get_conn() as conn, conn.cursor() as cur:
             capacity_val = parse_optional_int(capacity)
             cur.execute(
@@ -288,6 +297,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
     @router.get('/role/{role_id}/edit', response_class=HTMLResponse)
     def edit_role(request: Request, role_id: int, msg: Optional[str] = None):
+        """Открывает форму редактирования роли с данными темы."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -300,7 +310,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
             )
             role = cur.fetchone()
             if not role:
-                notice = urllib.parse.quote('???? ?? ???????')
+                notice = urllib.parse.quote('Роль не найдена')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
         role_data = dict(role)
         topic_info = {'id': role_data['topic_id'], 'title': role_data['topic_title']}
@@ -311,8 +321,8 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
                 'topic': topic_info,
                 'role': role_data,
                 'form_action': '/update-role',
-                'submit_label': '????????? ????',
-                'page_title': f'???? #{role_id}: ??????????????',
+                'submit_label': 'Обновить роль',
+                'page_title': f'Роль #{role_id}: редактирование',
                 'msg': msg,
             },
         )
@@ -326,6 +336,7 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
         required_skills: Optional[str] = Form(None),
         capacity: Optional[str] = Form(None),
     ):
+        """Обновляет параметры роли и ставит задачу на пересчёт эмбеддинга."""
         with ctx.get_conn() as conn, conn.cursor() as cur:
             capacity_val = parse_optional_int(capacity)
             cur.execute(
@@ -343,29 +354,31 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
             )
             row = cur.fetchone()
             if not row:
-                notice = urllib.parse.quote('???? ?? ???????')
+                notice = urllib.parse.quote('Роль не найдена')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
             topic_id_value = row[0]
             enqueue_refresh(conn, "role", role_id)
         sync_roles_sheet()
-        notice = urllib.parse.quote('???? ?????????')
+        notice = urllib.parse.quote('Роль обновлена')
         return RedirectResponse(url=f'/topic/{topic_id_value}?msg={notice}', status_code=303)
 
     @router.post('/role/{role_id}/delete')
     def delete_role(request: Request, role_id: int):
+        """Удаляет роль и синхронизирует изменения с таблицей ролей."""
         with ctx.get_conn() as conn, conn.cursor() as cur:
             cur.execute('DELETE FROM roles WHERE id=%s RETURNING topic_id', (role_id,))
             row = cur.fetchone()
             if not row:
-                notice = urllib.parse.quote('???? ?? ???????')
+                notice = urllib.parse.quote('Роль не найдена')
                 return RedirectResponse(url=f'/?tab=topics&msg={notice}', status_code=303)
             topic_id_value = row[0]
         sync_roles_sheet()
-        notice = urllib.parse.quote('???? ???????')
+        notice = urllib.parse.quote('Роль удалена')
         return RedirectResponse(url=f'/topic/{topic_id_value}?msg={notice}', status_code=303)
 
     @router.get('/role/{role_id}', response_class=HTMLResponse)
     def view_role(request: Request, role_id: int, msg: Optional[str] = None):
+        """Показывает информацию о роли и рекомендованных кандидатах."""
         with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 '''
@@ -405,12 +418,14 @@ def register(router: APIRouter, ctx: AdminContext) -> None:
 
 
 def _load_supervisors(ctx: AdminContext) -> List[Dict[str, Any]]:
+    """Возвращает список руководителей для выбора в формах."""
     with ctx.get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT id, full_name FROM users WHERE role='supervisor' ORDER BY full_name ASC")
         return [dict(r) for r in cur.fetchall()]
 
 
 def _ensure_author(ctx: AdminContext, author_user_id: Optional[str], author_full_name: Optional[str]) -> int:
+    """Находит или создаёт пользователя-наставника для указанной темы."""
     author_uid = parse_optional_int(author_user_id)
     if author_uid is not None:
         return author_uid

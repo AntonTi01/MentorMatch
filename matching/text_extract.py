@@ -5,6 +5,7 @@ from typing import Optional
 
 
 def _read_text_file(p: Path) -> str:
+    """Выполняет функцию _read_text_file."""
     try:
         return p.read_text(encoding="utf-8", errors="ignore")
     except Exception:
@@ -15,6 +16,7 @@ def _read_text_file(p: Path) -> str:
 
 
 def _read_pdf(p: Path) -> str:
+    """Выполняет функцию _read_pdf."""
     try:
         from pypdf import PdfReader
 
@@ -31,8 +33,9 @@ def _read_pdf(p: Path) -> str:
 
 
 def _read_docx(p: Path) -> str:
+    """Выполняет функцию _read_docx."""
     try:
-        import docx  # python-docx
+        import docx               
 
         doc = docx.Document(str(p))
         parts = []
@@ -51,7 +54,7 @@ def extract_text_from_file(path: Path, mime_type: Optional[str] = None) -> str:
     mt = (mime_type or "").lower()
     ext = p.suffix.lower()
 
-    # Prefer MIME when available
+                                
     if "pdf" in mt or ext == ".pdf":
         text = _read_pdf(p)
         if text:
@@ -65,7 +68,7 @@ def extract_text_from_file(path: Path, mime_type: Optional[str] = None) -> str:
         if text:
             return text
 
-    # Fallback tries
+                    
     text = _read_text_file(p)
     if text:
         return text

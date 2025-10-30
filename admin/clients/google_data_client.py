@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _post(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Отправляет POST-запрос в сервис Google Data и возвращает ответ как JSON."""
     url = f"{GOOGLE_DATA_SERVICE_URL.rstrip('/')}{path}"
     try:
         response = httpx.post(url, json=payload, timeout=120)
@@ -22,6 +23,7 @@ def _post(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def import_students(spreadsheet_id: str, sheet_name: Optional[str] = None) -> Dict[str, Any]:
+    """Просит сервис Google Data импортировать студентов из указанного листа."""
     payload: Dict[str, Any] = {'spreadsheet_id': spreadsheet_id}
     if sheet_name:
         payload['sheet_name'] = sheet_name
@@ -29,6 +31,7 @@ def import_students(spreadsheet_id: str, sheet_name: Optional[str] = None) -> Di
 
 
 def import_supervisors(spreadsheet_id: str, sheet_name: Optional[str] = None) -> Dict[str, Any]:
+    """Запускает импорт наставников из таблицы Google Sheet."""
     payload: Dict[str, Any] = {'spreadsheet_id': spreadsheet_id}
     if sheet_name:
         payload['sheet_name'] = sheet_name
@@ -36,6 +39,7 @@ def import_supervisors(spreadsheet_id: str, sheet_name: Optional[str] = None) ->
 
 
 def sync_roles_sheet(*, spreadsheet_id: Optional[str] = None, service_account_file: Optional[str] = None) -> bool:
+    """Экспортирует пары наставник-студент в Google Sheet и возвращает успешность."""
     payload: Dict[str, Any] = {}
     if spreadsheet_id:
         payload['spreadsheet_id'] = spreadsheet_id
