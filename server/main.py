@@ -769,27 +769,80 @@ def api_self_register(
     link = normalize_telegram_link(username) if username else None
     tg_id_val = parse_optional_int(tg_id)
     tg_id_for_name = extract_telegram_username(username) or (str(tg_id).strip() if tg_id else '')
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            '''
-            INSERT INTO users(full_name, email, username, telegram_id, role, is_confirmed, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, TRUE, now(), now())
-            RETURNING id
-            ''', (
-                (full_name or f'Telegram user {tg_id_for_name}').strip(),
-                (email or None),
-                link,
-                tg_id_val,
-                r,
-            ),
-        )
-        uid = cur.fetchone()[0]
-        if r == 'student':
-            cur.execute("INSERT INTO student_profiles(user_id) VALUES (%s)", (uid,))
-            enqueue_refresh(conn, 'student', uid)
-        else:
-            cur.execute("INSERT INTO supervisor_profiles(user_id) VALUES (%s)", (uid,))
-            enqueue_refresh(conn, 'supervisor', uid)
+    full_name_val = (full_name or f'Telegram user {tg_id_for_name}').strip()
+    email_val = email or None
+    with get_conn() as conn:
+        existing_user = None
+        if tg_id_val is not None:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    '''
+                    SELECT id, role, full_name, email, username, is_confirmed
+                    FROM users
+                    WHERE telegram_id=%s
+                    ''',
+                    (tg_id_val,),
+                )
+                existing_user = cur.fetchone()
+        if existing_user:
+            uid = existing_user['id']
+            existing_role = (existing_user.get('role') or '').strip().lower()
+            role_to_return = existing_role if existing_role in ('student', 'supervisor') else r
+            update_clauses = []
+            params = []
+            if full_name_val and full_name_val != (existing_user.get('full_name') or '').strip():
+                update_clauses.append('full_name=%s')
+                params.append(full_name_val)
+            if email_val is not None and email_val != existing_user.get('email'):
+                update_clauses.append('email=%s')
+                params.append(email_val)
+            if link and link != (existing_user.get('username') or None):
+                update_clauses.append('username=%s')
+                params.append(link)
+            if not existing_user.get('is_confirmed'):
+                update_clauses.append('is_confirmed=TRUE')
+            if update_clauses:
+                update_clauses.append('updated_at=now()')
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"UPDATE users SET {', '.join(update_clauses)} WHERE id=%s",
+                        (*params, uid),
+                    )
+            with conn.cursor() as cur:
+                refresh_kind = None
+                if role_to_return == 'student':
+                    cur.execute("SELECT 1 FROM student_profiles WHERE user_id=%s", (uid,))
+                    if cur.fetchone() is None:
+                        cur.execute("INSERT INTO student_profiles(user_id) VALUES (%s)", (uid,))
+                        refresh_kind = 'student'
+                elif role_to_return == 'supervisor':
+                    cur.execute("SELECT 1 FROM supervisor_profiles WHERE user_id=%s", (uid,))
+                    if cur.fetchone() is None:
+                        cur.execute("INSERT INTO supervisor_profiles(user_id) VALUES (%s)", (uid,))
+                        refresh_kind = 'supervisor'
+                if refresh_kind:
+                    enqueue_refresh(conn, refresh_kind, uid)
+            commit_with_refresh(conn)
+            return {'status': 'ok', 'user_id': uid, 'role': role_to_return}
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                '''
+                INSERT INTO users(full_name, email, username, telegram_id, role, is_confirmed, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, TRUE, now(), now())
+                RETURNING id
+                ''',
+                (full_name_val, email_val, link, tg_id_val, r),
+            )
+            uid_row = cur.fetchone()
+            uid = uid_row['id'] if uid_row else None
+            if uid is None:
+                raise HTTPException(status_code=500, detail='Unable to create user record')
+            if r == 'student':
+                cur.execute("INSERT INTO student_profiles(user_id) VALUES (%s)", (uid,))
+                enqueue_refresh(conn, 'student', uid)
+            else:
+                cur.execute("INSERT INTO supervisor_profiles(user_id) VALUES (%s)", (uid,))
+                enqueue_refresh(conn, 'supervisor', uid)
         commit_with_refresh(conn)
     return {'status': 'ok', 'user_id': uid, 'role': r}
 

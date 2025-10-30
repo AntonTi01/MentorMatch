@@ -5,6 +5,7 @@ import logging
 from typing import Dict, List, Optional
 
 from telegram import InlineKeyboardButton, Update
+from telegram.error import NetworkError
 from telegram.ext import ContextTypes
 
 from .base import BaseHandlers
@@ -223,4 +224,8 @@ class MenuHandlers(BaseHandlers):
 
     async def on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Выполняет функцию on_error."""
-        logger.exception("Handler error", exc_info=context.error)
+        error = getattr(context, "error", None)
+        if isinstance(error, NetworkError):
+            logger.warning("Telegram network error ignored: %s", error)
+            return
+        logger.exception("Handler error", exc_info=error)

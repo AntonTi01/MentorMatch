@@ -3,10 +3,13 @@ from __future__ import annotations
 import mimetypes
 import os
 import re
+import time
 from pathlib import Path
 from typing import Optional, Tuple
 
 import requests
+from requests import Response
+from requests.exceptions import HTTPError, RequestException, SSLError
 
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media")).resolve()
 
@@ -52,6 +55,29 @@ def _safe_name(name: str) -> str:
 
 
                                                          
+def _download_with_retries(url: str, *, attempts: int = 3, timeout: int = 30) -> Response:
+    """Best-effort GET with exponential backoff for transient TLS/connection glitches."""
+    last_error: Optional[Exception] = None
+    tries = max(1, attempts)
+    for attempt in range(1, tries + 1):
+        try:
+            response = requests.get(url, stream=True, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except HTTPError:
+            # Non-2xx codes usually won't succeed on retry; bubble up immediately.
+            raise
+        except (SSLError, RequestException) as exc:
+            last_error = exc
+            if attempt >= tries:
+                break
+            delay = min(1.5 ** (attempt - 1), 5.0)
+            time.sleep(delay)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Download failed without an explicit requests exception")
+
+
 def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, category: str = "cv") -> Tuple[int, str]:
     """Скачивает файл, сохраняет его локально и регистрирует запись в базе."""
     if not url or not url.strip():
@@ -62,8 +88,7 @@ def persist_media_from_url(conn, owner_user_id: Optional[int], url: str, categor
 
     _ensure_media_root()
 
-    response = requests.get(url, stream=True, timeout=30)
-    response.raise_for_status()
+    response = _download_with_retries(url)
     content_type = response.headers.get("Content-Type") or "application/octet-stream"
     filename = _safe_name(_guess_filename(url, response.headers.get("Content-Disposition")))
     if not os.path.splitext(filename)[1]:
