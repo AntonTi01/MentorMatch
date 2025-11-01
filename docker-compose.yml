@@ -122,7 +122,7 @@ services:
   bot:
     build: ./bot
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       SERVER_URL: http://server:8000

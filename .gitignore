@@ -6,6 +6,7 @@ service-account.json
 secrets/
 keys/
 credentials/
+matching/models/
 
 # Переменные окружения
 .env
